@@ -12,6 +12,9 @@ actually settles, and then it settles atomically in a single programmable transa
 
 Built at ETHGlobal Tokyo 2026 for the Sui DeFi & Payments track. **Testnet only. Unaudited.**
 
+**Live:** app at [suijin-app.pages.dev](https://suijin-app.pages.dev), API at
+[suijin-api.xfajarr-web3.workers.dev](https://suijin-api.xfajarr-web3.workers.dev/v1/health).
+
 | Term | Meaning |
 |---|---|
 | **Provider** | Anyone who makes their tokens available to trade: a person, a DAO treasury, a token team, a payments app, a market maker. Called `maker` in the code. |
@@ -210,7 +213,7 @@ From `bun run e2e` and `bun run smoke` on testnet:
 contracts/suijin/      Move: app (Allowance binding), math, strategy, order, settlement + 26 tests
 contracts/mock_coins/  Move: tUSD and tJPY test coins with open faucets
 packages/sdk/          TypeScript: transaction builders, chain reads, math mirror, quote engine
-apps/server/           Bun: POST /v1/quote (resolver) and POST /v1/orders/:id/fill (executor)
+apps/server/           POST /v1/quote (resolver) and POST /v1/orders/:id/fill (executor): Bun locally, a Cloudflare Worker live
 apps/web/              web app: Swap, Pay, Earn, Limit, Portfolio (React + dApp Kit)
 scripts/               deploy.ts, e2e.ts (live proof), smoke-server.ts, smoke-defi.ts (live HTTP tests)
 docs/superpowers/plans implementation plan with every design decision
@@ -232,9 +235,19 @@ bun run smoke:defi             # two-sided liquidity, reverse swap and exact-out
 bun run web                    # web app on http://localhost:5173
 ```
 
-The web app reads `VITE_SERVER_URL` (default `http://localhost:8790`). To rehearse without a wallet
-extension, start it with `VITE_BURNER=1`: dApp Kit then offers an in-browser burner wallet (fund it
-with testnet SUI, then press Faucet for tUSD and tJPY).
+The web app reads `VITE_SERVER_URL` (default `http://localhost:8790`; production builds use
+`apps/web/.env.production`). To rehearse without a wallet extension, start it with `VITE_BURNER=1`:
+dApp Kit then offers an in-browser burner wallet (fund it with testnet SUI, then press Faucet for tUSD
+and tJPY).
+
+Deploy (Cloudflare, logged in with `bunx wrangler login`):
+
+```bash
+cd apps/server && bunx wrangler deploy                    # API: the same routes as bun run server, as a Worker
+grep ^EXECUTOR_SECRET_KEY= ../../.env | cut -d= -f2- | bunx wrangler secret put EXECUTOR_SECRET_KEY
+cd ../web && bun run deploy:pages                         # app: builds and uploads to Cloudflare Pages
+SERVER_URL=https://suijin-api.xfajarr-web3.workers.dev bun run smoke:defi   # live check of the deployed API
+```
 
 Tests:
 
