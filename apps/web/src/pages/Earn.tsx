@@ -514,7 +514,7 @@ function PriceStepper(p: { price: string | null; onChange: (v: string) => void; 
     <div className="fieldset">
       <div className="spread">
         <label htmlFor={id} className="field-label">
-          Your price <span className="faint">· tJPY for 1 tUSD</span>
+          Your price
         </label>
         {mid !== null && (
           <button type="button" className="chip-btn" onClick={() => p.onChange(priceText(p.mid!))}>
@@ -527,6 +527,9 @@ function PriceStepper(p: { price: string | null; onChange: (v: string) => void; 
           −
         </button>
         <label htmlFor={id} className={`stepper-field${P !== null && P <= 0n ? ' invalid' : ''}`}>
+          <span className="unit-pre">
+            <CoinIcon coin="tUSD" size={18} />1 tUSD =
+          </span>
           {p.price === null ? (
             <Skeleton w={90} h={24} />
           ) : (
@@ -540,13 +543,17 @@ function PriceStepper(p: { price: string | null; onChange: (v: string) => void; 
               onChange={(e) => p.onChange(cleanAmount(e.target.value))}
             />
           )}
-          <span className="faint small">tJPY</span>
+          <span className="unit-post">
+            tJPY
+            <CoinIcon coin="tJPY" size={18} />
+          </span>
         </label>
         <button type="button" className="step-btn" onClick={() => step(1)} aria-label="Raise price by 0.1%">
           +
         </button>
       </div>
-      <span className="small muted">
+      <span className="spread small muted">
+        <span>
         {p.loading ? 'Loading market…' : mid !== null ? <>Market <b className="ink">{num(mid)}</b></> : 'No live market yet'}
         {off !== null && Math.abs(off) >= 0.0005 && (
           <span className={`pv-tag${hurts ? ' bad-tag' : ''}`}>
@@ -554,6 +561,8 @@ function PriceStepper(p: { price: string | null; onChange: (v: string) => void; 
             {Math.abs(off * 100).toFixed(1)}% vs market
           </span>
         )}
+        </span>
+        {cur !== null && cur > 0 && <span className="faint">1 tJPY = {num(1 / cur)} tUSD</span>}
       </span>
       {hurts && (
         <span className="hint warn">
