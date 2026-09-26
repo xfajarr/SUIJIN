@@ -48,9 +48,13 @@ export type CoinInfo = {
   faucet?: { module: 'tjpy' | 'tusd'; id: string };
 };
 
+const SUI_ICON =
+  'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2216%22%20r%3D%2216%22%20fill%3D%22%234DA2FF%22%2F%3E%3Cg%20transform%3D%22translate%286.4%205.6%29%20scale%280.8%29%22%3E%3Cpath%20fill%3D%22%23fff%22%20d%3D%22M17.636%2010.009a7.16%207.16%200%200%201%201.565%204.474%207.2%207.2%200%200%201-1.608%204.53l-.087.106-.023-.135a7%207%200%200%200-.07-.349c-.502-2.21-2.142-4.106-4.84-5.642-1.823-1.034-2.866-2.278-3.14-3.693-.177-.915-.046-1.834.209-2.62.254-.787.631-1.446.953-1.843l1.05-1.284a.46.46%200%200%201%20.713%200l5.28%206.456zm1.66-1.283L12.26.123a.336.336%200%200%200-.52%200L4.704%208.726l-.023.029a9.33%209.33%200%200%200-2.07%205.872C2.612%2019.803%206.816%2024%2012%2024s9.388-4.197%209.388-9.373a9.32%209.32%200%200%200-2.07-5.871zM6.389%209.981l.63-.77.018.142q.023.17.055.34c.408%202.136%201.862%203.917%204.294%205.297%202.114%201.203%203.345%202.586%203.7%204.103a5.3%205.3%200%200%201%20.109%201.801l-.004.034-.03.014A7.2%207.2%200%200%201%2012%2021.67c-3.976%200-7.2-3.218-7.2-7.188%200-1.705.594-3.27%201.587-4.503z%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E';
+
 /** Real testnet tokens anyone can trade against. Add a line here to list another one. */
 const TESTNET_TOKENS: CoinInfo[] = [
-  { key: 'SUI', type: '0x2::sui::SUI', symbol: 'SUI', name: 'Sui', decimals: 9, quoteRank: 1 },
+  // SUI's on-chain metadata has no icon: the Sui drop, inline so it never depends on a third-party host.
+  { key: 'SUI', type: '0x2::sui::SUI', symbol: 'SUI', name: 'Sui', decimals: 9, quoteRank: 1, iconUrl: SUI_ICON },
   {
     key: 'USDC',
     type: '0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC',
