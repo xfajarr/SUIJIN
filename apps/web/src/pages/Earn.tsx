@@ -577,8 +577,20 @@ function Preview({ plan, P, shape, feeBps, depth, expiresAtMs, now }: { plan: Si
                   ? `Traders pay 1 tUSD and get ${num(start)} tJPY from you.`
                   : `Traders pay ${num(start)} tJPY and get 1 tUSD from you.`}
             </p>
-            {amount !== null && Pn !== null && (
-              <PriceChart coin={s.coin} amount={amount} mid={Pn} fee={fee} shape={shape} depth={depth} />
+            {shape === 'fixed' && start !== null && Pn !== null && (
+              <p className="pv-flat">
+                Every fill is at <b>{num(start)}</b>, <b>{feeLabel} {sellsJpy ? 'below' : 'above'}</b> the market {num(Pn)}. That gap is your
+                spread: it is what you earn per fill.
+              </p>
+            )}
+            {shape === 'curve' && amount !== null && Pn !== null && (
+              <>
+                <PriceChart coin={s.coin} amount={amount} mid={Pn} fee={fee} shape={shape} depth={depth} />
+                <p className="pv-note">
+                  How far the price moves depends on depth, not on budget size: a {depth}× pool moves it the same share whether you offer 1 or
+                  1,000,000 {s.coin}.
+                </p>
+              </>
             )}
             {amount !== null && (
               <div className="kv pv-total">
