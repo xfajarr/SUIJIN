@@ -48,8 +48,11 @@ export function parseAmount(text: string, decimals: number): bigint | null {
 }
 /** Price text -> PRICE_SCALE fixed point. */
 export const parsePrice = (text: string) => parseAmount(text, 6);
-/** PRICE_SCALE fixed point -> editable text. */
-export const priceText = (p: bigint) => toInput(p, 6);
+/** PRICE_SCALE fixed point -> editable text with 6 significant digits: "150.412", "3.21547", "0.0312345". */
+export const priceText = (p: bigint) => {
+  const x = Number(p) / 1e6;
+  return x >= 1e-6 ? String(Number(x.toPrecision(6))) : toInput(p, 6);
+};
 /** Raw units -> editable text without grouping, e.g. for MAX. */
 export const toInput = (v: bigint, decimals: number) => formatUnits(v, decimals, decimals).replace(/,/g, '');
 /** Keeps what a user types to a decimal with at most `decimals` fraction digits. Commas are grouping. */

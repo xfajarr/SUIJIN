@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { amt, cleanAmount, parseAmount, rate, toInput, until } from '../src/format';
+import { amt, cleanAmount, parseAmount, priceText, rate, toInput, until } from '../src/format';
 
 test('typing: digits and one dot, at most `decimals` places, commas are grouping', () => {
   expect(cleanAmount('1,500.25', 6)).toBe('1500.25');
@@ -29,4 +29,11 @@ test('display: 2 decimals, or up to 6 below one unit; MAX round-trips exactly', 
   expect(rate(3_200_000n, 6, 1_000_000_000n, 9)).toBe('3.2'); // 1 SUI = 3.2 USDC
   expect(until(1_000, 5_000)).toBe('expired');
   expect(until(90 * 60_000, 0)).toBe('1h 30m');
+});
+
+test('price text: 6 significant digits that parse back', () => {
+  expect(priceText(150_411_950n)).toBe('150.412');
+  expect(priceText(3_215_470n)).toBe('3.21547');
+  expect(priceText(31_234n)).toBe('0.031234');
+  expect(priceText(150_000_000n)).toBe('150');
 });
