@@ -16,7 +16,10 @@
 - **Deadline:** submit by **08:00 JST Sunday**, one hour before the 09:00 cut-off.
 - **Everything here was verified on 2026-09-26** in a scratch copy of this exact tree (sui 1.80.1, bun 1.3.11):
   - `sui move test`: **26/26 pass**
-  - `bun run test:ts`: **22/22 pass**
+  - `bun run test:ts`: **24/24 pass**
+  - **Execution run (lanes A and B):** the plan was executed by two parallel agents, then checked by a coordinator. The live server smoke test (`bun run smoke`) found two bugs, both fixed and now part of Task 15:
+    - the GraphQL indexer lags the fullnode (D12);
+    - port 8787 was already taken (D11).
   - `bun run typecheck`: clean
   - `vite build`: OK
   - **Live end-to-end on devnet with these contracts** (`FRESH=1 bun scripts/e2e.ts` → `E2E OK`):
@@ -63,6 +66,8 @@ apps/web (dapp-kit v2): Maker tab · Trade tab · settlement inspector
 | D8 | Publish through the SDK (`scripts/deploy.ts`) with the **executor key**. Executor = publisher | `ProtocolConfig.executor` is set in `init`. The script records every ID into `packages/sdk/src/deployment.json` |
 | D9 | Events are declared in the module that emits them (no `events.move`) | Sui only lets a module emit event types it defines |
 | D10 | A maker allowance must have an expiry (`ENoExpiry`) | Keeps the maker's permission bounded in time, as spec §6.1 wants |
+| D11 | The server's default port is **8790** | 8787 is wrangler's default and was already bound on `127.0.0.1` by another local app, so `localhost` could reach the wrong server over IPv4 |
+| D12 | Before planning a fill, the executor waits up to 10 s for the order and payment allowance to appear in GraphQL (`eventually`) | The web app asks for a fill right after the order tx, and the indexer lags the fullnode by a few seconds. Without the wait the reply was `ORDER_NOT_FOUND` (reproduced live) |
 
 ## 3. File structure
 
@@ -87,12 +92,13 @@ suijin/
     src/config.ts  src/deployment.json  src/math.ts  src/state.ts
     src/quote.ts   src/tx.ts            src/read.ts  src/index.ts
     tests/math.test.ts  tests/quote.test.ts
-  apps/server/               resolver + executor (holds EXECUTOR_SECRET_KEY)
-    src/plan.ts  src/executor.ts  src/index.ts  tests/plan.test.ts
+  apps/server/               resolver + executor (holds EXECUTOR_SECRET_KEY), port 8790
+    src/plan.ts  src/eventually.ts  src/executor.ts  src/index.ts
+    tests/plan.test.ts  tests/eventually.test.ts
   apps/web/                  dApp
     index.html  vite.config.ts  tsconfig.json
     src/dapp-kit.ts  src/chain.ts  src/Maker.tsx  src/Trade.tsx  src/App.tsx  src/main.tsx  src/styles.css
-  scripts/                   deploy.ts (publish + record IDs), e2e.ts (live proof)
+  scripts/                   deploy.ts (publish + record IDs), e2e.ts (live proof), smoke-server.ts (live HTTP test)
   docs/superpowers/plans/    this file
 ```
 
@@ -144,6 +150,7 @@ Expected: `sui 1.80.1-...` or newer. Anything below 1.80 has no `sui::allowance`
     "typecheck": "tsc -p tsconfig.json && tsc -p apps/web/tsconfig.json",
     "deploy": "bun scripts/deploy.ts testnet",
     "e2e": "bun scripts/e2e.ts",
+    "smoke": "bun scripts/smoke-server.ts",
     "server": "bun apps/server/src/index.ts",
     "web": "cd apps/web && bunx vite"
   },
@@ -189,7 +196,7 @@ contracts/*/build
 EXECUTOR_SECRET_KEY=
 MAKER_SECRET_KEY=
 TAKER_SECRET_KEY=
-PORT=8787
+PORT=8790
 ```
 
 - [ ] **Step 3: Create every workspace `package.json` now, so one install covers all lanes**
@@ -258,7 +265,7 @@ cd /Users/xfajarr/Hackathon/ethglobal-tokyo/suijin/scripts
 for who in EXECUTOR MAKER TAKER; do
   bun -e "import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'; const k = new Ed25519Keypair(); console.log('# ${who} ' + k.toSuiAddress()); console.log('${who}_SECRET_KEY=' + k.getSecretKey())" >> ../.env
 done
-echo "PORT=8787" >> ../.env && cat ../.env
+echo "PORT=8790" >> ../.env && cat ../.env
 ```
 Expected: three `# NAME 0x…` comment lines, each followed by `NAME_SECRET_KEY=suiprivkey1…`.
 
@@ -273,9 +280,9 @@ Expected: three `# NAME 0x…` comment lines, each followed by `NAME_SECRET_KEY=
 
 ```bash
 cd /Users/xfajarr/Hackathon/ethglobal-tokyo/suijin/scripts
-bun -e "import { SuiGrpcClient } from '@mysten/sui/grpc'; import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'; const c = new SuiGrpcClient({ network: 'testnet', baseUrl: 'https://fullnode.testnet.sui.io:443' }); for (const n of ['EXECUTOR','MAKER','TAKER']) { const a = Ed25519Keypair.fromSecretKey(process.env[n + '_SECRET_KEY']).toSuiAddress(); const { balance } = await c.getBalance({ owner: a }); console.log(n, a, Number(balance.balance) / 1e9, 'SUI'); }"
+bun --env-file=../.env -e "import { SuiGrpcClient } from '@mysten/sui/grpc'; import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'; const c = new SuiGrpcClient({ network: 'testnet', baseUrl: 'https://fullnode.testnet.sui.io:443' }); for (const n of ['EXECUTOR','MAKER','TAKER']) { const a = Ed25519Keypair.fromSecretKey(process.env[n + '_SECRET_KEY']).toSuiAddress(); const { balance } = await c.getBalance({ owner: a }); console.log(n, a, Number(balance.balance) / 1e9, 'SUI'); }"
 ```
-Run it from `scripts/` so Bun loads `../.env`. If it prints `undefined`, run `set -a; source ../.env; set +a` first.
+Bun reads `.env` only from the directory it runs in. From `scripts/` you need `--env-file=../.env` (verified). Root scripts such as `bun run e2e` pick up `suijin/.env` automatically.
 
 Expected: EXECUTOR ≥ 2 SUI, MAKER and TAKER > 0.
 
@@ -1537,12 +1544,12 @@ fun assert_taker_allowance<Base, Quote>(a: &Allowance<Balance<Quote>>, order: &S
 }
 ```
 
-- [ ] **Step 4: Run the whole suite**
+- [ ] **Step 4: Run the settlement tests, then the whole suite**
 
 ```bash
-sui move test
+sui move test settlement_tests && sui move test
 ```
-Expected: `Test result: OK. Total tests: 26; passed: 26; failed: 0`
+Expected: `Total tests: 9; passed: 9` for settlement, then `Test result: OK. Total tests: 26; passed: 26; failed: 0`
 
 - [ ] **Step 5: Commit**
 
@@ -2800,17 +2807,79 @@ git add apps/server && git commit -m "feat(server): fill pre-flight with readabl
 ### Task 15: Executor and HTTP API
 
 **Files:**
+- Test: `apps/server/tests/eventually.test.ts`
+- Create: `apps/server/src/eventually.ts`
 - Create: `apps/server/src/executor.ts`
 - Create: `apps/server/src/index.ts`
+- Create: `scripts/smoke-server.ts`
 
-Depends on: Task 13 (a real `deployment.json`). The server refuses to start when the executor key does not match it.
+Depends on:
+- Task 13 (a real `deployment.json`). The server refuses to start when the executor key does not match it.
+- Funded MAKER and TAKER keys, for the smoke test in Step 10.
 
-- [ ] **Step 1: Create `apps/server/src/executor.ts`**
+- [ ] **Step 1: Write the failing test `apps/server/tests/eventually.test.ts`**
+
+The executor must tolerate the GraphQL indexer lagging the fullnode (D12).
+
+```ts
+import { describe, expect, test } from 'bun:test';
+import { eventually } from '../src/eventually';
+
+describe('eventually', () => {
+  test('returns as soon as the read finds the object', async () => {
+    let calls = 0;
+    const value = await eventually(async () => (++calls >= 3 ? 'order' : null), 5, 1);
+    expect(value).toBe('order');
+    expect(calls).toBe(3);
+  });
+
+  test('gives up with null after the last attempt', async () => {
+    let calls = 0;
+    const value = await eventually(async () => {
+      calls++;
+      return null;
+    }, 4, 1);
+    expect(value).toBeNull();
+    expect(calls).toBe(4);
+  });
+});
+```
+
+- [ ] **Step 2: Run it to verify it fails**
+
+```bash
+cd apps/server && bun test tests/eventually.test.ts
+```
+Expected: FAIL with `error: Cannot find module '../src/eventually'`.
+
+- [ ] **Step 3: Implement `apps/server/src/eventually.ts`**
+
+```ts
+/** GraphQL indexes a moment after the fullnode: retry a read until it returns something. */
+export async function eventually<T>(read: () => Promise<T | null>, attempts = 10, delayMs = 1000): Promise<T | null> {
+  for (let i = 0; i < attempts; i++) {
+    const value = await read();
+    if (value !== null) return value;
+    if (i < attempts - 1) await Bun.sleep(delayMs);
+  }
+  return null;
+}
+```
+
+- [ ] **Step 4: Run the server tests to verify they pass**
+
+```bash
+bun test
+```
+Expected: `8 pass, 0 fail` (plan + eventually)
+
+- [ ] **Step 5: Create `apps/server/src/executor.ts`**
 
 ```ts
 import type { SuiGrpcClient } from '@mysten/sui/grpc';
 import type { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 import { buildFill, getAllowance, getOrder, getStrategy } from '@suijin/sdk';
+import { eventually } from './eventually';
 import { planFill } from './plan';
 
 export type FillOutcome = { ok: true; digest: string } | { ok: false; error: string };
@@ -2830,10 +2899,11 @@ export function fillOrder(client: SuiGrpcClient, signer: Ed25519Keypair, orderId
 }
 
 async function settle(client: SuiGrpcClient, signer: Ed25519Keypair, orderId: string, takerAllowanceId: string): Promise<FillOutcome> {
-  const order = await getOrder(orderId);
+  // The web app asks for a fill right after the order tx lands; the indexer can be a few seconds behind.
+  const order = await eventually(() => getOrder(orderId));
   const [strategy, payment] = await Promise.all([
     order ? getStrategy(order.strategyId) : null,
-    getAllowance(takerAllowanceId),
+    eventually(() => getAllowance(takerAllowanceId)),
   ]);
   const plan = planFill(order, strategy, payment, takerAllowanceId, Date.now());
   if (!plan.ok) return plan;
@@ -2855,7 +2925,7 @@ async function settle(client: SuiGrpcClient, signer: Ed25519Keypair, orderId: st
 }
 ```
 
-- [ ] **Step 2: Create `apps/server/src/index.ts`**
+- [ ] **Step 6: Create `apps/server/src/index.ts`**
 
 ```ts
 import { SuiGrpcClient } from '@mysten/sui/grpc';
@@ -2911,7 +2981,7 @@ async function quotes(quoteIn: bigint) {
 }
 
 const server = Bun.serve({
-  port: Number(process.env.PORT ?? 8787),
+  port: Number(process.env.PORT ?? 8790),
   routes: {
     '/v1/health': () => json({ ok: true, network: DEPLOYMENT.network, executor: DEPLOYMENT.executor }),
     '/v1/strategies': { GET: async () => json(await listStrategies()), OPTIONS: preflight },
@@ -2939,27 +3009,114 @@ const server = Bun.serve({
 console.log(`suijin server on ${server.url} (${DEPLOYMENT.network}, executor ${DEPLOYMENT.executor})`);
 ```
 
-- [ ] **Step 3: Typecheck and start**
+- [ ] **Step 7: Create `scripts/smoke-server.ts`**
+
+This is the live HTTP test. It requests a fill immediately after the order transaction, as the web app does.
+
+```ts
+// Live smoke test for the RUNNING server (bun run server): drives it over HTTP
+// exactly like the web app does: fill is requested immediately after the order tx.
+import { SuiGrpcClient } from '@mysten/sui/grpc';
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
+import type { Transaction } from '@mysten/sui/transactions';
+import { DEPLOYMENT, GRPC_URL, createFixedStrategy, createTakerOrder, getOrder, issueMakerAllowance, mintTestCoin } from '@suijin/sdk';
+
+const SERVER = 'http://localhost:8790';
+const client = new SuiGrpcClient({ network: DEPLOYMENT.network, baseUrl: GRPC_URL() });
+const maker = Ed25519Keypair.fromSecretKey(process.env.MAKER_SECRET_KEY!);
+const taker = Ed25519Keypair.fromSecretKey(process.env.TAKER_SECRET_KEY!);
+const post = (path: string, body: unknown) =>
+  fetch(`${SERVER}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
+
+function check(ok: boolean, msg: string) {
+  if (!ok) throw new Error(`FAILED: ${msg}`);
+  console.log(`  ✓ ${msg}`);
+}
+
+async function run(label: string, tx: Transaction, signer: Ed25519Keypair) {
+  const r = await client.signAndExecuteTransaction({ transaction: tx, signer, include: { effects: true, objectTypes: true } });
+  if (r.$kind === 'FailedTransaction') throw new Error(`${label}: ${r.FailedTransaction.status.error?.message}`);
+  await client.waitForTransaction({ result: r });
+  console.log(`  ${label}: ${r.Transaction.digest}`);
+  return (fragment: string) =>
+    r.Transaction.effects.changedObjects.find((c) => c.idOperation === 'Created' && r.Transaction.objectTypes[c.objectId]?.includes(fragment))?.objectId ?? '';
+}
+
+const health = await fetch(`${SERVER}/v1/health`).then((r) => r.json());
+check(health.ok === true && health.executor === DEPLOYMENT.executor, `health ok (${health.network})`);
+
+console.log('maker setup');
+await run('mint tJPY', mintTestCoin('tjpy', 1_000_000_000_000n), maker);
+const issued = await run('allowance', issueMakerAllowance({ cap: 1_000_000_000_000n, expiresAtMs: Date.now() + 3_600_000 }), maker);
+const allowanceId = issued('::allowance::Allowance<');
+await run('fixed strategy', createFixedStrategy({ allowanceId, priceNum: 1n, priceDen: 150n, maxBasePerFill: 10n ** 12n, virtualBaseLimit: 10n ** 12n, expiresAtMs: Date.now() + 3_600_000 }), maker);
+
+console.log('quote via server');
+let quotes: { strategyId: string; makerAllowanceId: string; quoteIn: string; baseOut: string; minBaseOut: string }[] = [];
+for (let i = 0; i < 20 && !quotes.some((q) => q.makerAllowanceId === allowanceId); i++) {
+  quotes = await post('/v1/quote', { quoteIn: '10000000' });
+  if (!quotes.some((q) => q.makerAllowanceId === allowanceId)) await Bun.sleep(1000);
+}
+const q = quotes.find((x) => x.makerAllowanceId === allowanceId);
+check(!!q && q.baseOut === '1500000000', `server quoted 1,500 tJPY for 10 tUSD`);
+
+console.log('taker order, then IMMEDIATE fill request (no client-side retry)');
+await run('mint tUSD', mintTestCoin('tusd', 100_000_000n), taker);
+const placed = await run(
+  'order',
+  createTakerOrder({ strategyId: q!.strategyId, quoteIn: BigInt(q!.quoteIn), minBaseOut: BigInt(q!.minBaseOut), quotedBaseOut: BigInt(q!.baseOut), expiresAtMs: Date.now() + 600_000, recipient: taker.toSuiAddress() }),
+  taker,
+);
+const orderId = placed('::order::SwapOrder<');
+const paymentId = placed('::allowance::Allowance<');
+const fill = await post(`/v1/orders/${orderId}/fill`, { takerAllowanceId: paymentId });
+check(fill.ok === true, `server filled the order right away (${fill.digest ?? fill.error})`);
+
+const again = await post(`/v1/orders/${orderId}/fill`, { takerAllowanceId: paymentId });
+check(again.ok === true && again.digest === fill.digest, 'second fill request is idempotent (same digest)');
+
+for (let i = 0; i < 20; i++) {
+  const o = await getOrder(orderId);
+  if (o?.status === 'filled') break;
+  await Bun.sleep(1000);
+}
+check((await getOrder(orderId))?.status === 'filled', 'order is filled on chain');
+console.log('\nSERVER SMOKE OK');
+```
+
+- [ ] **Step 8: Typecheck and start**
 
 ```bash
 bunx tsc -p tsconfig.json && bun run server
 ```
-Expected: `suijin server on http://localhost:8787/ (testnet, executor 0x…)`
+Expected: `suijin server on http://localhost:8790/ (testnet, executor 0x…)`
 
-- [ ] **Step 4: Smoke-test from a second terminal**
+- [ ] **Step 9: Check health from a second terminal**
 
 ```bash
-curl -s localhost:8787/v1/health
-curl -s -X POST localhost:8787/v1/quote -H 'content-type: application/json' -d '{"quoteIn":"10000000"}'
+curl -s localhost:8790/v1/health
 ```
-Expected:
-- The first call returns `{"ok":true,"network":"testnet","executor":"0x…"}`.
-- The second returns `[]` until a maker has an allowance and strategies. After Task 19 it returns two quotes.
+Expected: `{"ok":true,"network":"testnet","executor":"0x…"}`. If you get HTML from another app, something else owns the port: set `PORT` in `.env` and `VITE_SERVER_URL` for the web app.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 10: Run the live smoke test (server still running)**
 
 ```bash
-git add apps/server && git commit -m "feat(server): resolver and executor endpoints"
+bun run smoke
+```
+Expected, ending with:
+```
+  ✓ server quoted 1,500 tJPY for 10 tUSD
+  ✓ server filled the order right away (…)
+  ✓ second fill request is idempotent (same digest)
+  ✓ order is filled on chain
+
+SERVER SMOKE OK
+```
+
+- [ ] **Step 11: Commit**
+
+```bash
+git add apps/server scripts/smoke-server.ts && git commit -m "feat(server): resolver and executor endpoints, live smoke test"
 ```
 
 ---
@@ -3096,7 +3253,7 @@ import type { Transaction } from '@mysten/sui/transactions';
 import { DEPLOYMENT, type Quote } from '@suijin/sdk';
 import { useCallback, useEffect, useState } from 'react';
 
-export const SERVER = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:8787';
+export const SERVER = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:8790';
 export const explorerTx = (digest: string) => `https://suiscan.xyz/${DEPLOYMENT.network}/tx/${digest}`;
 
 /** Sign with the wallet, wait for effects, and return helpers to find created objects by type. */
@@ -3738,13 +3895,14 @@ fill, revoke).
     bun install
     cp .env.example .env   # fill the three keys
     bun run deploy          # once, with a funded executor key
-    bun run server          # resolver + executor on :8787
+    bun run server          # resolver + executor on :8790
     bun run web             # http://localhost:5173
 
 ## Tests
     cd contracts/suijin && sui move test   # 26 tests
-    bun run test:ts                        # 22 tests
+    bun run test:ts                        # 24 tests
     bun run e2e                            # live proof on testnet
+    bun run smoke                          # live HTTP test (server running)
 ```
 
 - [ ] **Step 2: Fill in the Proof section with the real links, then commit**
