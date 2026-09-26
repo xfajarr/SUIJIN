@@ -1,0 +1,24 @@
+/* Docs: sticky table of contents beside a readable column. */
+.docs { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 36px; align-items: start; }
+.doc-toc { position: sticky; top: 20px; display: flex; flex-direction: column; gap: 2px; }
+.doc-toc button { border: 0; background: transparent; color: var(--muted); text-align: left; font-size: 14px; font-weight: 600; padding: 6px 10px; border-radius: 8px; }
+.doc-toc button:hover { color: var(--ink); background: rgba(232, 251, 247, 0.06); }
+.doc-body { max-width: 760px; display: flex; flex-direction: column; gap: 40px; font-size: 15px; line-height: 1.65; color: var(--muted); }
+.doc-section { scroll-margin-top: 20px; display: flex; flex-direction: column; gap: 12px; }
+.doc-h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; text-transform: none; color: var(--ink); }
+.doc-body h3 { margin: 10px 0 0; font-size: 16px; color: var(--ink); }
+.doc-body p, .doc-body ul, .doc-body ol { margin: 0; }
+.doc-body ul, .doc-body ol { padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.doc-body b { color: var(--ink); }
+.doc-body code { font-family: var(--font-mono); font-size: 0.85em; color: var(--ink); background: rgba(232, 251, 247, 0.07); padding: 1px 5px; border-radius: 5px; overflow-wrap: anywhere; }
+.doc-code { margin: 0; padding: 14px 16px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; color: var(--ink); overflow-x: auto; }
+.doc-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.doc-table th { text-align: left; font-size: 12px; font-weight: 600; color: var(--faint); padding: 0 12px 8px 0; }
+.doc-table td { padding: 10px 12px 10px 0; border-top: 1px solid var(--line); vertical-align: top; }
+.doc-table td:first-child { color: var(--ink); font-weight: 600; white-space: nowrap; }
+.doc-checks li::marker { color: var(--accent); font-weight: 700; }
+@media (max-width: 860px) {
+  .docs { grid-template-columns: 1fr; }
+  .doc-toc { position: static; flex-direction: row; flex-wrap: wrap; }
+  .doc-table td:first-child { white-space: normal; }
+}

@@ -1,0 +1,281 @@
+import { DEPLOYMENT } from '@suijin/sdk';
+import type { ReactNode } from 'react';
+import { explorer } from '../chain';
+import './docs.css';
+
+// Technical reference for what Suijin uses and what we built. Static content, mirrors the code.
+
+const SECTIONS = [
+  ['overview', 'Overview'],
+  ['architecture', 'Architecture'],
+  ['sui', 'Sui primitives'],
+  ['objects', 'On-chain objects'],
+  ['flows', 'Flows'],
+  ['math', 'Pricing math'],
+  ['settlement', 'Settlement checks'],
+  ['security', 'Security model'],
+  ['limits', 'Limitations'],
+  ['api', 'API'],
+  ['sdk', 'SDK'],
+  ['deployments', 'Deployments'],
+] as const;
+
+const Section = ({ id, title, children }: { id: string; title: string; children: ReactNode }) => (
+  <section id={id} className="doc-section">
+    <h2 className="doc-h2">{title}</h2>
+    {children}
+  </section>
+);
+
+const Code = ({ children }: { children: string }) => <pre className="doc-code">{children.trim()}</pre>;
+
+export function Docs() {
+  const go = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  return (
+    <div className="page">
+      <div className="page-head">
+        <div>
+          <h1>Docs</h1>
+          <p>How Suijin works under the hood: the Sui primitives it builds on, the contracts, the math and the API.</p>
+        </div>
+      </div>
+      <div className="docs">
+        <nav className="doc-toc" aria-label="On this page">
+          {SECTIONS.map(([id, label]) => (
+            <button key={id} type="button" onClick={() => go(id)}>
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        <article className="doc-body">
+          <Section id="overview" title="Overview">
+            <p>
+              <b>Suijin lets one self-custodial wallet balance back many markets at once.</b> A provider grants a Sui Allowance (capped,
+              expiring, revocable, and spendable only through Suijin's Move package) instead of depositing into a pool. Markets quote against
+              that permission; coins move only when a trade settles, atomically, in one programmable transaction block (PTB).
+            </p>
+            <table className="doc-table">
+              <tbody>
+                <tr><td>Provider</td><td>Anyone offering liquidity from their wallet. <code>maker</code> in code.</td></tr>
+                <tr><td>Trader</td><td>Anyone swapping or paying against that liquidity. <code>taker</code> in code.</td></tr>
+                <tr><td>Budget</td><td>A provider's Allowance: "the executor may pull up to X of my coin, only through Suijin, until T".</td></tr>
+                <tr><td>Market</td><td>A <code>Strategy</code> object: how one budget is priced (fixed or curve).</td></tr>
+                <tr><td>Executor</td><td>The service that submits settlements. It chooses <i>when</i>, never <i>what</i>.</td></tr>
+              </tbody>
+            </table>
+          </Section>
+
+          <Section id="architecture" title="Architecture">
+            <Code>{`
+ Web app (Cloudflare Pages)        API (Cloudflare Worker)             Sui testnet
+ React + dApp Kit                  quotes + executor                   package suijin
+ ───────────────────────           ────────────────────────            ─────────────────────
+ build & sign txs  ─────────────────────────────────────────────────►  app, strategy, order,
+ POST /v1/quote    ──────────────► read markets (GraphQL, then          settlement, math
+                                   fresh from a fullnode over gRPC)
+                   ◄────────────── routes, best first
+ POST /v1/orders/{id}/fill ─────►  re-check, sign one PTB ──────────►  settlement::fill
+            `}</Code>
+            <ul>
+              <li><b>contracts/suijin</b>: Move. <code>app</code> (Allowance binding, the only spend path), <code>math</code>, <code>strategy</code>, <code>order</code>, <code>settlement</code>. 26 tests.</li>
+              <li><b>packages/sdk</b>: TypeScript builders for every entry point, readers, the quote engine, and the Move math mirrored for off-chain pricing.</li>
+              <li><b>apps/server</b>: one fetch handler (quotes + fills). Bun locally, a Cloudflare Worker in production with the executor key as a secret.</li>
+              <li><b>apps/web</b>: React 19, Vite, <code>@mysten/dapp-kit-react</code>, on Cloudflare Pages.</li>
+            </ul>
+          </Section>
+
+          <Section id="sui" title="Sui primitives">
+            <table className="doc-table">
+              <thead>
+                <tr><th>Primitive</th><th>How Suijin uses it</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>App-bound Allowances</td>
+                  <td>
+                    <code>allowance::propose_for_app&lt;Balance&lt;C&gt;, App&gt;</code> then <code>issue</code> with a <code>SettingsPermit&lt;App&gt;</code>. Spending needs a
+                    <code> SpendPermit</code> minted by <code>internal::permit&lt;App&gt;()</code>, which only Suijin's own modules can call. Spender = the executor. Funders
+                    <code> revoke</code> any time. <code>rotate_spender</code> exists for a future executor rotation.
+                  </td>
+                </tr>
+                <tr><td>Address balances</td><td>Coins stay as plain wallet balances. Settlement withdraws with <code>tx.withdrawal(&#123; from: 'allowance' &#125;)</code> and delivers with <code>balance::send_funds</code>.</td></tr>
+                <tr><td>PTBs</td><td>One fill = one PTB with two Allowance withdrawals. Two budgets or two markets are created in one PTB.</td></tr>
+                <tr><td>Shared objects</td><td><code>Strategy</code>, <code>SwapOrder</code> and Allowances are shared, so the executor can settle any of them.</td></tr>
+                <tr><td>Coin Registry</td><td>tUSD and tJPY use <code>coin_registry::new_currency_with_otw</code>; <code>finalize_registration</code> publishes their metadata (6 decimals).</td></tr>
+                <tr><td>gRPC + GraphQL</td><td>GraphQL for discovery and history (paginated). gRPC fullnode reads for anything that prices or settles, so quotes match what Move recomputes.</td></tr>
+              </tbody>
+            </table>
+          </Section>
+
+          <Section id="objects" title="On-chain objects">
+            <Code>{`
+Strategy<Base, Quote>            // a market; Base = what the provider sells
+  maker, maker_allowance_id      // who, and which budget pays
+  kind: 0 fixed | 1 curve
+  price_num, price_den           // fixed: price_num Quote units buy price_den Base units
+  virtual_base, virtual_quote    // curve: virtual reserves (x · y = k)
+  fee_bps                        // curve fee, taken from the input
+  max_base_per_fill, virtual_base_remaining, expiry_ms, active
+  fill_count, base_filled, quote_received
+
+SwapOrder<Base, Quote>           // a trader's intent
+  taker, recipient, strategy_id
+  quote_in                       // exact input, equal to the payment Allowance cap
+  min_base_out, quoted_base_out, expiry_ms
+  status: 0 open | 1 filled | 2 cancelled
+
+ProtocolConfig { executor, paused }   events: StrategyCreated, OrderCreated, Fill
+            `}</Code>
+          </Section>
+
+          <Section id="flows" title="Flows">
+            <h3>Earn (provide liquidity)</h3>
+            <ol>
+              <li><b>Grant a budget</b>: <code>propose_for_app</code> + <code>app::issue_maker_allowance</code>. Checks: funder = sender, spender = executor, an expiry is set. No coins move.</li>
+              <li><b>Open markets</b>: <code>strategy::create_fixed</code> or <code>create_curve</code> on that Allowance. A second transaction, because a shared object created in a PTB cannot be used later in the same PTB.</li>
+              <li><b>Reuse a budget</b>: open another market on an existing Allowance (step 2 only). Every market draws on the same balance and cap: one balance, many markets.</li>
+            </ol>
+            <h3>Limit</h3>
+            <p>One fixed-price market on its own budget (cap = order size). It fills whenever it is a trader's best route, partially allowed. Cancel revokes the budget; pause flips <code>active</code>.</p>
+            <h3>Swap</h3>
+            <ol>
+              <li><b>Quote</b>: <code>POST /v1/quote</code>. Each route is capped by min(provider balance, budget left, market remaining, max per fill). Paused, expired or revoked markets are skipped.</li>
+              <li><b>Order</b>: the trader signs <code>propose_for_app</code> (cap = exact <code>quote_in</code>, 5-minute expiry) + <code>order::create</code>. Nothing moves.</li>
+              <li><b>Settle</b>: <code>POST /v1/orders/&#123;id&#125;/fill</code>; the executor submits <code>settlement::fill</code>. It pays this gas.</li>
+            </ol>
+            <h3>Pay</h3>
+            <p>
+              Swap with an exact output and a different recipient. The quote finds the cheapest input and adds the slippage buffer to it;
+              <code> min_base_out</code> equals the target, so the recipient gets at least the requested amount. Request links:
+              <code> #/pay?to=0x…&amp;amount=1500&amp;coin=tJPY</code>.
+            </p>
+            <h3>Portfolio</h3>
+            <p>Reads the wallet's AllowanceCaps (budgets vs unspent payment approvals, told apart by name), its strategies, and <code>Fill</code> events. Actions: <code>strategy::set_active</code>, <code>allowance::revoke</code>.</p>
+          </Section>
+
+          <Section id="math" title="Pricing math">
+            <p>All amounts are integers in 6-decimal units. Move (<code>math.move</code>) and TypeScript (<code>math.ts</code>) implement the same formulas with shared test vectors; everything runs in u128 and rounds in the provider's favour.</p>
+            <h3>Fixed price</h3>
+            <Code>{`base_out = floor(quote_in × price_den / price_num)`}</Code>
+            <p>Earn bakes the fee tier into the price as a spread (P = tJPY per tUSD, f = fee in bps):</p>
+            <Code>{`
+sell tJPY:  price_num = 1e6 × 10000      price_den = P × (10000 − f)
+sell tUSD:  price_num = P × (10000 + f)  price_den = 1e6 × 10000
+            `}</Code>
+            <h3>Curve (constant product on virtual reserves)</h3>
+            <Code>{`
+effective_in = quote_in × (10000 − fee_bps) / 10000
+k            = virtual_base × virtual_quote
+new_base     = ceil(k / (virtual_quote + effective_in))
+base_out     = virtual_base − new_base
+            `}</Code>
+            <p>Earn sets <code>virtual_base = budget × m</code> and <code>virtual_quote</code> so the starting price equals P. The budget still caps what can sell (<code>virtual_base_remaining</code>), so m only changes how fast the price moves:</p>
+            <table className="doc-table">
+              <thead>
+                <tr><th>"Price moves"</th><th>m</th><th>Move when all of it sells = (m / (m − 1))²</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Very fast</td><td>1</td><td>unbounded (never fully sells)</td></tr>
+                <tr><td>Fast</td><td>5</td><td>1.56× (56%)</td></tr>
+                <tr><td>Slow</td><td>20</td><td>1.11× (11%)</td></tr>
+                <tr><td>Barely</td><td>100</td><td>1.02× (2%)</td></tr>
+              </tbody>
+            </table>
+            <h3>Quotes</h3>
+            <Code>{`
+exact input  (Swap): min_base_out = base_out × (1 − slippage)
+exact output (Pay):  quote_in = ceil(needed × (1 + slippage)),  min_base_out = target
+price impact:        ideal = quote_in × (1 − fee) × vb / vq,  impact = (ideal − out) / ideal
+            `}</Code>
+          </Section>
+
+          <Section id="settlement" title="Settlement checks">
+            <p><code>settlement::fill</code> derives every amount and recipient itself. Any failed check reverts the whole PTB, so nothing moves.</p>
+            <ol className="doc-checks">
+              <li>Protocol not paused; sender is <code>ProtocolConfig.executor</code>.</li>
+              <li>The order belongs to this strategy, is open and not expired.</li>
+              <li>The provider Allowance is the strategy's; the trader Allowance is funded by the order's taker with cap = <code>quote_in</code> and the same expiry.</li>
+              <li><code>base_out = strategy.quote(quote_in)</code> is recomputed; the market is active, not expired, within max per fill and remaining size.</li>
+              <li><code>base_out ≥ min_base_out</code> (slippage).</li>
+              <li>Both Allowances are spent through the package-only permit, and the withdrawn amounts must equal <code>base_out</code> and <code>quote_in</code> exactly.</li>
+              <li>Stats update, the order is marked filled, the quote coin goes to the provider and the base coin to the order's recipient, and a <code>Fill</code> event is emitted.</li>
+            </ol>
+          </Section>
+
+          <Section id="security" title="Security model">
+            <table className="doc-table">
+              <thead>
+                <tr><th>The executor can</th><th>The executor cannot</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Delay or censor orders</td><td>Change a price or amount: Move recomputes both and checks the withdrawals exactly</td></tr>
+                <tr><td>Choose the order of fills</td><td>Change a recipient: fixed in the strategy and the order</td></tr>
+                <tr><td></td><td>Spend another way: only <code>suijin::app</code> mints the spend permit</td></tr>
+                <tr><td></td><td>Exceed a cap, an expiry or a real balance: the Sui framework enforces these</td></tr>
+              </tbody>
+            </table>
+            <p>Providers revoke any time (the Allowance is deleted). Traders approve an exact amount that expires in five minutes, and each order fills at most once.</p>
+          </Section>
+
+          <Section id="limits" title="Limitations">
+            <ul>
+              <li>An Allowance is a permission, not a guarantee: if a provider moves their coins, fills fail.</li>
+              <li>One executor today; it can delay orders but not steal.</li>
+              <li>Prices are set by providers; there is no oracle yet.</li>
+              <li>The shared-liquidity ratio is availability, not TVL: not every market on a budget can fill at once.</li>
+              <li>Sui Allowances are live on testnet and devnet only. Unaudited hackathon code.</li>
+            </ul>
+          </Section>
+
+          <Section id="api" title="API">
+            <table className="doc-table">
+              <thead>
+                <tr><th>Endpoint</th><th>Body</th><th>Response</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>GET /v1/health</code></td><td></td><td><code>&#123; ok, network, executor, api &#125;</code></td></tr>
+                <tr><td><code>GET /v1/strategies</code></td><td></td><td>every market with its state</td></tr>
+                <tr><td><code>POST /v1/quote</code></td><td><code>&#123; sell, buy, amountIn | amountOut, slippageBps &#125;</code></td><td>routes, best first, with <code>impactBps</code> and <code>feeBps</code></td></tr>
+                <tr><td><code>POST /v1/orders/&#123;id&#125;/fill</code></td><td><code>&#123; takerAllowanceId &#125;</code></td><td><code>&#123; ok, digest &#125;</code> or 409 <code>&#123; ok: false, error &#125;</code></td></tr>
+              </tbody>
+            </table>
+            <p>Amounts are integer strings in base units. Live at <code>https://suijin-api.xfajarr-web3.workers.dev</code>.</p>
+          </Section>
+
+          <Section id="sdk" title="SDK">
+            <Code>{`
+import { createTakerOrder } from '@suijin/sdk';
+
+const [best] = await fetch(API + '/v1/quote', {
+  method: 'POST',
+  body: JSON.stringify({ sell: 'tUSD', buy: 'tJPY', amountIn: '10000000' }),
+}).then((r) => r.json());
+
+const tx = createTakerOrder({
+  strategyId: best.strategyId, quoteIn: BigInt(best.quoteIn),
+  minBaseOut: BigInt(best.minBaseOut), quotedBaseOut: BigInt(best.baseOut),
+  expiresAtMs: Date.now() + 5 * 60_000, recipient: account.address,
+  pair: { base: best.baseType, quote: best.quoteType },
+});
+// sign, then POST /v1/orders/{orderId}/fill with the created payment Allowance id
+            `}</Code>
+            <p>Also: <code>issueAllowances</code>, <code>createStrategies</code>, <code>setStrategyActive</code>, <code>revokeAllowance</code>, <code>listStrategies</code>, <code>listFills</code>, <code>freshStrategies</code>, <code>freshAllowances</code>.</p>
+          </Section>
+
+          <Section id="deployments" title="Deployments">
+            <table className="doc-table">
+              <tbody>
+                <tr><td>Package suijin</td><td><a href={explorer.object(DEPLOYMENT.packageId)} target="_blank" rel="noreferrer"><code>{DEPLOYMENT.packageId}</code></a></td></tr>
+                <tr><td>ProtocolConfig</td><td><code>{DEPLOYMENT.configId}</code></td></tr>
+                <tr><td>Executor</td><td><code>{DEPLOYMENT.executor}</code></td></tr>
+                <tr><td>Package mock_coins</td><td><a href={explorer.object(DEPLOYMENT.mockCoinsPackageId)} target="_blank" rel="noreferrer"><code>{DEPLOYMENT.mockCoinsPackageId}</code></a></td></tr>
+                <tr><td>Source</td><td><a href="https://github.com/xfajarr/SUIJIN" target="_blank" rel="noreferrer">github.com/xfajarr/SUIJIN</a></td></tr>
+              </tbody>
+            </table>
+          </Section>
+        </article>
+      </div>
+    </div>
+  );
+}
