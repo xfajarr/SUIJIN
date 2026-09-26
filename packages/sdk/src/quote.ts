@@ -17,6 +17,8 @@ export type Quote = {
   expiresAtMs: number;
   /** Execution price vs the strategy's marginal price, in basis points. Always 0 for fixed rate. */
   impactBps: number;
+  /** Curve fee kept by the provider, in basis points. 0 for fixed rate (any spread is in the price). */
+  feeBps: number;
 };
 
 /** Key for `makerBalances`: one provider's address balance of one coin. */
@@ -89,6 +91,7 @@ export function buildQuotes(input: QuoteInput): Quote[] {
       minBaseOut: input.baseOut !== undefined ? input.baseOut : (baseOut * (10_000n - slippageBps)) / 10_000n,
       expiresAtMs: nowMs + ttlMs,
       impactBps: impactBps(s, quoteIn, baseOut),
+      feeBps: s.kind === 'curve' ? Number(s.feeBps) : 0,
     });
   }
   return quotes.sort((a, b) => (input.quoteIn !== undefined ? cmp(b.baseOut, a.baseOut) : cmp(a.quoteIn, b.quoteIn)));

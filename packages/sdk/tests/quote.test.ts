@@ -38,6 +38,7 @@ const allowance = (over: Partial<AllowanceState> = {}): AllowanceState => ({
   funder: MAKER,
   spender: '0xe',
   app: 'pkg::app::App',
+  name: 'suijin liquidity budget',
   lifetimeCap: 1_000_000_000_000n,
   expirationMs: 9_000_000n,
   currentSpend: 0n,

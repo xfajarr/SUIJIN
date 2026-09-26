@@ -96,6 +96,8 @@ export type AllowanceState = {
   funder: string;
   spender: string | null;
   app: string | null;
+  /** 'suijin liquidity budget' (provider) or 'suijin order payment' (trader). */
+  name: string | null;
   lifetimeCap: bigint | null;
   expirationMs: bigint | null;
   currentSpend: bigint;
@@ -108,6 +110,7 @@ export function parseAllowance(json: Record<string, unknown>): AllowanceState {
     funder: String(s.funder),
     spender: s.spender === null || s.spender === undefined ? null : String(s.spender),
     app: s.app === null || s.app === undefined ? null : String(s.app),
+    name: s.name === null || s.name === undefined ? null : String(s.name),
     lifetimeCap: optBig(s.lifetime_cap),
     expirationMs: optBig(s.expiration_timestamp_ms),
     currentSpend: big(json.current_spend),

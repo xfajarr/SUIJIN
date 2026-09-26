@@ -47,6 +47,7 @@ const payment: AllowanceState = {
   funder: '0xb',
   spender: '0xe',
   app: 'pkg::app::App',
+  name: 'suijin order payment',
   lifetimeCap: 10_000_000n,
   expirationMs: 60_000n,
   currentSpend: 0n,

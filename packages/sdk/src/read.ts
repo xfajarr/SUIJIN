@@ -17,15 +17,35 @@ async function gql<T>(query: string, variables: Record<string, unknown>, d: Depl
 type Contents = { type: { repr: string }; json: Record<string, unknown> };
 type Node = { address: string; asMoveObject: { contents: Contents } | null };
 
+type Page<T> = { nodes: T[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } };
+
+/** Walks a paginated GraphQL connection. ponytail: stops at 10 pages (500 items); an indexer takes over past that. */
+async function allPages<T>(fetchPage: (after: string | null) => Promise<Page<T> | null>): Promise<T[]> {
+  const out: T[] = [];
+  let after: string | null = null;
+  for (let i = 0; i < 10; i++) {
+    const page: Page<T> | null = await fetchPage(after);
+    if (!page) break;
+    out.push(...page.nodes);
+    if (!page.pageInfo.hasNextPage) break;
+    after = page.pageInfo.endCursor;
+  }
+  return out;
+}
+
+const PAGE_INFO = 'pageInfo { hasNextPage endCursor }';
+
 export async function listStrategies(d: Deployment = DEPLOYMENT): Promise<StrategyState[]> {
-  const data = await gql<{ objects: { nodes: Node[] } }>(
-    `query ($type: String!) { objects(first: 50, filter: { type: $type }) { nodes { address asMoveObject { contents { type { repr } json } } } } }`,
-    { type: typesOf(d).strategy },
-    d,
+  const nodes = await allPages(async (after) =>
+    (
+      await gql<{ objects: Page<Node> }>(
+        `query ($type: String!, $after: String) { objects(first: 50, after: $after, filter: { type: $type }) { ${PAGE_INFO} nodes { address asMoveObject { contents { type { repr } json } } } } }`,
+        { type: typesOf(d).strategy, after },
+        d,
+      )
+    ).objects,
   );
-  return data.objects.nodes
-    .filter((n) => n.asMoveObject)
-    .map((n) => parseStrategy(n.asMoveObject!.contents.json, n.asMoveObject!.contents.type.repr));
+  return nodes.filter((n) => n.asMoveObject).map((n) => parseStrategy(n.asMoveObject!.contents.json, n.asMoveObject!.contents.type.repr));
 }
 
 async function objectContents(id: string, d: Deployment): Promise<Contents | null> {
@@ -61,15 +81,15 @@ export async function listAllowanceCaps(
 ): Promise<{ capId: string; allowanceId: string }[]> {
   // Owned objects come back as MoveObject already: `contents` sits directly on the node.
   type OwnedNode = { address: string; contents: { json: Record<string, unknown> } };
-  const data = await gql<{ address: { objects: { nodes: OwnedNode[] } } | null }>(
-    `query ($owner: SuiAddress!, $type: String!) { address(address: $owner) { objects(first: 50, filter: { type: $type }) { nodes { address contents { json } } } } }`,
-    { owner, type: typesOf(d).allowanceCap(coin) },
-    d,
-  );
-  return (data.address?.objects.nodes ?? []).map((n) => ({
-    capId: n.address,
-    allowanceId: String(n.contents.json.allowance),
-  }));
+  const nodes = await allPages(async (after) => {
+    const data = await gql<{ address: { objects: Page<OwnedNode> } | null }>(
+      `query ($owner: SuiAddress!, $type: String!, $after: String) { address(address: $owner) { objects(first: 50, after: $after, filter: { type: $type }) { ${PAGE_INFO} nodes { address contents { json } } } } }`,
+      { owner, type: typesOf(d).allowanceCap(coin), after },
+      d,
+    );
+    return data.address?.objects ?? null;
+  });
+  return nodes.map((n) => ({ capId: n.address, allowanceId: String(n.contents.json.allowance) }));
 }
 
 export type FillEvent = {
@@ -119,9 +139,9 @@ export async function listFills(d: Deployment = DEPLOYMENT, last = 40): Promise<
 // or settles a trade; GraphQL above is for discovery and history. Same JSON shape as GraphQL.
 async function freshContents(client: SuiGrpcClient, ids: string[]): Promise<Map<string, { type: string; json: Record<string, unknown> }>> {
   const out = new Map<string, { type: string; json: Record<string, unknown> }>();
-  if (ids.length === 0) return out;
-  const { objects } = await client.getObjects({ objectIds: ids, include: { json: true } });
-  for (const o of objects) {
+  const chunks = Array.from({ length: Math.ceil(ids.length / 50) }, (_, i) => ids.slice(i * 50, i * 50 + 50));
+  const pages = await Promise.all(chunks.map((objectIds) => client.getObjects({ objectIds, include: { json: true } })));
+  for (const o of pages.flatMap((p) => p.objects)) {
     if (o instanceof Error || !o.json) continue; // deleted (e.g. a revoked allowance) or missing
     out.set(o.objectId, { type: o.type, json: o.json });
   }
