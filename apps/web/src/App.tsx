@@ -3,6 +3,7 @@ import { ConnectButton, ConnectModal } from '@mysten/dapp-kit-react/ui';
 import { DEPLOYMENT, mintTestCoins } from '@suijin/sdk';
 import { useEffect, useLayoutEffect, useRef, useState, type ComponentType } from 'react';
 import { SERVER, connectModal, explorer, fetchHealth, useAction, useBalances, usePoll } from './chain';
+import { Docs } from './pages/Docs';
 import { Earn } from './pages/Earn';
 import { Limit } from './pages/Limit';
 import { Pay } from './pages/Pay';
@@ -16,6 +17,7 @@ const PAGES: { path: string; Page: ComponentType }[] = [
   { path: 'earn', Page: Earn },
   { path: 'limit', Page: Limit },
   { path: 'portfolio', Page: Portfolio },
+  { path: 'docs', Page: Docs },
 ];
 
 /** Navbar: Swap, Pay and Limit live under one Trade card with its own tabs. */
@@ -23,6 +25,7 @@ const NAV = [
   { href: '#/swap', label: 'Trade', paths: ['swap', 'pay', 'limit'] },
   { href: '#/earn', label: 'Earn', paths: ['earn'] },
   { href: '#/portfolio', label: 'Portfolio', paths: ['portfolio'] },
+  { href: '#/docs', label: 'Docs', paths: ['docs'] },
 ];
 
 /** '#/pay?to=…' -> 'pay'. Pages read their own query params. */
