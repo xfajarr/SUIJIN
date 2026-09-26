@@ -1,0 +1,5 @@
+[package]
+name = "mock_coins"
+edition = "2024"
+
+[dependencies]
