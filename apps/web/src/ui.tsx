@@ -60,7 +60,7 @@ export function Options<T extends string | number>(p: {
   options: { value: T; title: ReactNode; caption?: ReactNode; icon?: ReactNode }[];
 }) {
   return (
-    <div className="options" role="radiogroup" aria-label={p.label} style={{ gridTemplateColumns: `repeat(${p.options.length}, minmax(0, 1fr))` }}>
+    <div className="options" role="radiogroup" aria-label={p.label} style={{ gridTemplateColumns: `repeat(${p.options.length > 3 ? 2 : p.options.length}, minmax(0, 1fr))` }}>
       {p.options.map((o) => (
         <button key={String(o.value)} type="button" role="radio" className="option" aria-checked={o.value === p.value} onClick={() => p.onChange(o.value)}>
           {o.icon}
