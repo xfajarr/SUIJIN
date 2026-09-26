@@ -399,51 +399,51 @@ export function Earn() {
             />
           ) : (
             <>
-              <div className="fieldset">
-                <span>Sides</span>
+              <Step n={1} title="What you offer">
                 <Segmented label="Sides" full value={sides} options={SIDES} onChange={setSides} />
-              </div>
-              <div className="fieldset">
-                <span>Shape</span>
-                <Options label="Shape" value={shape} options={SHAPES} onChange={setShape} />
-              </div>
-              <PriceField
-                label="Price"
-                value={price}
-                onChange={setPrice}
-                invalid={price !== null && price !== '' && (!P || P <= 0n)}
-                chips={
-                  market.mid !== null && (
-                    <button type="button" className="chip-btn" onClick={() => setPrice(priceText(market.mid!))}>
-                      Market
-                    </button>
-                  )
-                }
-                hint={market.loading ? 'Loading the market price…' : market.mid !== null ? `Market ${fmt(market.mid, 2)} tJPY` : 'No live market yet: 150 is a starting point.'}
-              />
-              <div className="fieldset">
-                <span>{shape === 'curve' ? 'Fee tier' : 'Spread'}</span>
-                <Options label={shape === 'curve' ? 'Fee tier' : 'Spread'} value={feeBps} options={FEES} onChange={setFeeBps} />
-              </div>
-              {shape === 'curve' && (
-                <div className="fieldset">
-                  <span>Depth</span>
-                  <Options label="Depth" value={depth} options={DEPTHS} onChange={setDepth} />
-                </div>
-              )}
-              {plan.map((s) => (
-                <SideBudget
-                  key={s.coin}
-                  s={s}
-                  connected={!!account}
-                  onText={(v) => setAmounts((a) => ({ ...a, [s.coin]: v }))}
-                  onReuse={(on) => setReuseFor(s, on)}
+              </Step>
+
+              <Step n={2} title="Price">
+                <Segmented
+                  label="Shape"
+                  full
+                  value={shape}
+                  onChange={setShape}
+                  options={SHAPES.map((o) => ({ value: o.value, label: o.title }))}
                 />
-              ))}
-              <div className="fieldset">
-                <span>Duration</span>
-                <Segmented label="Duration" full value={hours} options={DURATIONS} onChange={setHours} />
-              </div>
+                <PriceStepper price={price} onChange={setPrice} mid={market.mid} loading={market.loading} sides={sides} />
+                <div className="knob">
+                  <span>{shape === 'curve' ? 'Fee' : 'Spread'}</span>
+                  <Segmented label={shape === 'curve' ? 'Fee' : 'Spread'} value={feeBps} options={FEES.map((o) => ({ value: o.value, label: o.title }))} onChange={setFeeBps} />
+                </div>
+                <p className="knob-note">{FEES.find((o) => o.value === feeBps)?.caption}</p>
+                {shape === 'curve' && (
+                  <>
+                    <div className="knob">
+                      <span>Depth</span>
+                      <Segmented label="Depth" value={depth} options={DEPTHS.map((o) => ({ value: o.value, label: o.title }))} onChange={setDepth} />
+                    </div>
+                    <p className="knob-note">{DEPTHS.find((o) => o.value === depth)?.caption}</p>
+                  </>
+                )}
+              </Step>
+
+              <Step n={3} title="Amounts">
+                {plan.map((s) => (
+                  <SideBudget
+                    key={s.coin}
+                    s={s}
+                    connected={!!account}
+                    onText={(v) => setAmounts((a) => ({ ...a, [s.coin]: v }))}
+                    onReuse={(on) => setReuseFor(s, on)}
+                  />
+                ))}
+                <div className="knob">
+                  <span>Active for</span>
+                  <Segmented label="Active for" value={hours} options={DURATIONS} onChange={setHours} />
+                </div>
+              </Step>
+
               <button type="button" className="cta" disabled={!!account && !!problem} onClick={account ? submit : openConnect}>
                 {!account
                   ? 'Connect wallet'
@@ -467,33 +467,97 @@ function SideBudget({ s, connected, onText, onReuse }: { s: Side; connected: boo
         ? `This budget has ${fmt(room)} ${s.coin} left. Fills stop there.`
         : null
       : s.balance !== undefined && s.amount > s.balance
-        ? `Your wallet holds ${fmt(s.balance)} ${s.coin}: only that much is usable until you top up.`
+        ? `You hold ${fmt(s.balance)} ${s.coin}: only that much can sell until you top up.`
         : null;
   const max = s.budget ? s.budget.remaining : s.balance;
   return (
     <div className="fieldset">
-      {s.existing && (
-        <Segmented
-          label={`${s.coin} budget source`}
-          full
-          value={s.budget ? 'existing' : 'new'}
-          options={[
-            { value: 'new', label: 'New budget' },
-            { value: 'existing', label: `Existing · ${compact(s.existing.remaining ?? 0n)} left` },
-          ]}
-          onChange={(v) => onReuse(v === 'existing')}
-        />
-      )}
       <AmountPanel
-        label={s.budget ? `Sell up to, from your ${s.coin} budget` : `${s.coin} budget`}
+        label={`Sell up to`}
         coin={s.coin}
         value={s.text}
         onChange={onText}
         balance={connected ? (s.balance ?? null) : undefined}
         onMax={max !== undefined && max !== null ? () => onText(toInput(max)) : undefined}
         invalid={s.text !== '' && (s.amount === null || s.amount <= 0n)}
+        footer={
+          s.existing && (
+            <button type="button" className={`reuse${s.budget ? ' on' : ''}`} aria-pressed={!!s.budget} onClick={() => onReuse(!s.budget)}>
+              <span className="reuse-box">{s.budget && <Check size={10} />}</span>
+              Use my existing {s.coin} budget · {compact(s.existing.remaining ?? 0n)} left
+            </button>
+          )
+        }
       />
       {warn && <span className="hint warn">{warn}</span>}
+    </div>
+  );
+}
+
+function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
+  return (
+    <section className="step-block" aria-label={title}>
+      <h3 className="step-head">
+        <span className="step-num">{n}</span>
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
+/** "1 tUSD = [ 150.41 ] tJPY" with −/+ steps and a warning when the price is far from the market. */
+function PriceStepper(p: { price: string | null; onChange: (v: string) => void; mid: bigint | null; loading: boolean; sides: Sides }) {
+  const id = useId();
+  const P = parseAmount(p.price ?? '');
+  const mid = p.mid === null ? null : Number(p.mid) / 1e6;
+  const cur = P === null ? null : Number(P) / 1e6;
+  const step = (dir: 1 | -1) => cur !== null && p.onChange((Math.max(0.01, cur + dir * Math.max(0.01, cur * 0.001))).toFixed(2));
+  const off = cur !== null && mid ? (cur - mid) / mid : null;
+  // Selling tJPY above the market price hands traders cheap tJPY; selling tUSD below it hands them cheap tUSD.
+  const risky = off !== null && Math.abs(off) >= 0.02;
+  const loser = off === null ? null : off > 0 ? 'tJPY' : 'tUSD';
+  const hurts = risky && (p.sides === 'both' || p.sides === loser);
+  return (
+    <div className="fieldset">
+      <div className={`stepper${P !== null && P <= 0n ? ' invalid' : ''}`}>
+        <button type="button" className="step-btn" onClick={() => step(-1)} aria-label="Lower price">
+          −
+        </button>
+        <label htmlFor={id} className="stepper-mid">
+          <span className="faint small">1 tUSD =</span>
+          {p.price === null ? (
+            <Skeleton w={90} h={24} />
+          ) : (
+            <input id={id} inputMode="decimal" autoComplete="off" spellCheck={false} value={p.price} onChange={(e) => p.onChange(cleanAmount(e.target.value))} />
+          )}
+          <span className="faint small">tJPY</span>
+        </label>
+        <button type="button" className="step-btn" onClick={() => step(1)} aria-label="Raise price">
+          +
+        </button>
+      </div>
+      <div className="spread small">
+        <span className="muted">
+          {p.loading ? 'Loading market…' : mid !== null ? <>Market <b className="ink">{num(mid)}</b></> : 'No live market yet'}
+          {off !== null && Math.abs(off) >= 0.0005 && (
+            <span className={`pv-tag${hurts ? ' bad-tag' : ''}`}>
+              {off > 0 ? '+' : '−'}
+              {Math.abs(off * 100).toFixed(1)}% vs market
+            </span>
+          )}
+        </span>
+        {mid !== null && (
+          <button type="button" className="chip-btn" onClick={() => p.onChange(priceText(p.mid!))}>
+            Use market
+          </button>
+        )}
+      </div>
+      {hurts && (
+        <span className="hint warn">
+          Traders would buy your {loser} {Math.abs(off! * 100).toFixed(0)}% cheaper than the market. Move closer to {num(mid!)} unless you mean it.
+        </span>
+      )}
     </div>
   );
 }
@@ -538,7 +602,7 @@ function Preview({ plan, P, shape, feeBps, depth, expiresAtMs, now }: { plan: Si
               <span>Price</span>
               <span>
                 {start === null ? dash : <b>1 tUSD = {num(start)} tJPY</b>}
-                {start !== null && Pn !== null && <span className="pv-tag">{sellsJpy ? '−' : '+'}{feeLabel} vs market</span>}
+                {start !== null && Pn !== null && <span className="pv-tag">{sellsJpy ? '−' : '+'}{feeLabel} spread</span>}
               </span>
             </div>
             <div className="kv">
@@ -553,7 +617,7 @@ function Preview({ plan, P, shape, feeBps, depth, expiresAtMs, now }: { plan: Si
                     <b className="gold">
                       ≈ {num(total)} {pay}
                     </b>
-                    {shape === 'curve' && flat !== null && <span className="pv-tag up">{pctOf(total - flat)} vs market</span>}
+                    {shape === 'curve' && flat !== null && <span className="pv-tag up">{pctOf(total - flat)} vs your price</span>}
                   </>
                 ) : amount !== null ? (
                   <span className="faint">never fully sells</span>
