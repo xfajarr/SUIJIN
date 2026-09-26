@@ -306,7 +306,8 @@ const OUTDATED = 'The executor server is out of date. Restart it: bun run server
 
 /** Best first: most output (exact in) or cheapest input (exact out). */
 export async function fetchQuotes(req: QuoteRequest): Promise<Quote[]> {
-  const { status, data } = await call('/v1/quote', req);
+  // Full coin types, so tokens this browser added by hand quote too (the server only knows its registry's symbols).
+  const { status, data } = await call('/v1/quote', { ...req, sell: coin(req.sell).type, buy: coin(req.buy).type });
   if (status !== 200) throw new Error(/quoteIn must be/.test(String(data.error)) ? OUTDATED : (data.error ?? `Quote failed (${status})`));
   return (data as Record<string, unknown>[]).map(reviveQuote);
 }
