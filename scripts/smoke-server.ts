@@ -5,7 +5,7 @@ import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 import type { Transaction } from '@mysten/sui/transactions';
 import { DEPLOYMENT, GRPC_URL, createFixedStrategy, createTakerOrder, getOrder, issueMakerAllowance, mintTestCoin } from '@suijin/sdk';
 
-const SERVER = 'http://localhost:8790';
+const SERVER = process.env.SERVER_URL ?? 'http://localhost:8790';
 const client = new SuiGrpcClient({ network: DEPLOYMENT.network, baseUrl: GRPC_URL() });
 const maker = Ed25519Keypair.fromSecretKey(process.env.MAKER_SECRET_KEY!);
 const taker = Ed25519Keypair.fromSecretKey(process.env.TAKER_SECRET_KEY!);

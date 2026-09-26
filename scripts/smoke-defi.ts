@@ -17,7 +17,7 @@ import {
   mintTestCoins,
 } from '@suijin/sdk';
 
-const SERVER = `http://localhost:${process.env.PORT ?? 8790}`;
+const SERVER = process.env.SERVER_URL ?? `http://localhost:${process.env.PORT ?? 8790}`;
 const client = new SuiGrpcClient({ network: DEPLOYMENT.network, baseUrl: GRPC_URL() });
 const provider = Ed25519Keypair.fromSecretKey(process.env.MAKER_SECRET_KEY!);
 const trader = Ed25519Keypair.fromSecretKey(process.env.TAKER_SECRET_KEY!);
