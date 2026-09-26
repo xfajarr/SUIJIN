@@ -81,9 +81,9 @@ export function Pay() {
           )}
         </p>
       )}
-      <section className="card" aria-busy={live.loading}>
+      <section className="card trade-card" aria-busy={live.loading}>
         <div className="card-head">
-          <h1 className="card-title">Pay</h1>
+          <h1 className="mode">Pay</h1>
           <div className="inline">
             {quote && idle && <RefreshRing updatedAt={live.updatedAt} ms={REFRESH_MS} onClick={live.refresh} />}
             <button type="button" className="icon-btn" aria-expanded={settings} aria-label="Payment settings" onClick={() => setSettings((v) => !v)}>
@@ -129,6 +129,7 @@ export function Pay() {
           <AmountPanel
             label="You pay"
             coin={payWith}
+            outline
             value={quote ? fmt(quote.quoteIn) : ''}
             balance={me ? balance : undefined}
             loading={live.loading}
