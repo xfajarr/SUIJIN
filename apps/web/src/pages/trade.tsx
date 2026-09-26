@@ -2,7 +2,7 @@ import { useCurrentClient } from '@mysten/dapp-kit-react';
 import { createTakerOrder, type CoinKey, type Quote } from '@suijin/sdk';
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import { explorer, friendlyError, keyOf, refreshAll, requestFill, toast, useRun } from '../chain';
-import { Addr, Check, Chevron, Segmented, Skeleton, Steps, TxLink, fmt, fmtCoin, pct, rate, type StepState } from '../ui';
+import { Check, Chevron, Segmented, Skeleton, Steps, TxLink, fmt, fmtCoin, pct, rate, short, type StepState } from '../ui';
 
 // The trader side, shared by Swap and Pay: sign one order, then the executor settles it.
 
@@ -279,7 +279,7 @@ export function QuoteDetails(p: {
                     {i === 0 && <span className="chip accent">Best</span>}
                   </span>
                   <span className="faint small">
-                    Provider <Addr a={r.maker} />
+                    Provider <span className="mono">{short(r.maker)}</span>
                   </span>
                 </span>
                 <span className="num">{p.exactOut ? fmtCoin(r.quoteIn, p.sell) : fmtCoin(r.baseOut, p.buy)}</span>
