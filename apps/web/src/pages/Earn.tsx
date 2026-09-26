@@ -505,44 +505,82 @@ function Preview({ plan, P, shape, feeBps, depth, expiresAtMs, now }: { plan: Si
   const fee = feeBps / 10_000;
   // Price multiple once the whole budget is sold: (m / (m - 1))² on a curve with m× virtual depth.
   const move = depth > 1 ? (depth / (depth - 1)) ** 2 : null;
+  // Selling all of a budget off a curve costs traders m/(m-1) times the no-impact amount.
+  const curveTotal = depth > 1 ? depth / (depth - 1) : null;
   const feeLabel = FEES.find((f) => f.value === feeBps)?.title;
   return (
     <aside className="card preview" aria-label="Preview">
       <div className="card-head">
-        <h2>What traders see</h2>
+        <h2>Your position</h2>
         {plan.length > 1 && <span className="chip accent">Two-sided</span>}
       </div>
+      <p className="pv-intro">
+        {plan.length > 1 ? (
+          <>
+            Traders can buy <b>tJPY</b> and <b>tUSD</b> from your wallet. You earn on every fill, and nothing leaves your wallet until one
+            happens.
+          </>
+        ) : (
+          <>
+            Traders can buy <b>{plan[0]!.coin}</b> from your wallet and pay you in <b>{other(plan[0]!.coin)}</b>. Nothing leaves your
+            wallet until a fill happens.
+          </>
+        )}
+      </p>
       {plan.map((s) => {
         const sellsJpy = s.coin === 'tJPY';
-        const trade =
-          Pn === null ? '—' : sellsJpy ? `1 tUSD → ${num(Pn * (1 - fee))} tJPY` : `${num(shape === 'curve' ? Pn / (1 - fee) : Pn * (1 + fee))} tJPY → 1 tUSD`;
+        const pay = other(s.coin);
         // Trader price now (after fee) and once the budget is sold, in tJPY per tUSD.
-        const start = Pn === null ? null : sellsJpy ? Pn * (1 - fee) : Pn / (1 - fee);
+        const start = Pn === null ? null : sellsJpy ? Pn * (1 - fee) : shape === 'curve' ? Pn / (1 - fee) : Pn * (1 + fee);
         const end = start === null || move === null ? null : sellsJpy ? start / move : start * move;
+        const amount = s.amount ? Number(s.amount) / 1e6 : null;
+        // What the provider receives if the whole amount sells, and the fee part of it.
+        const flat = amount === null || Pn === null ? null : sellsJpy ? amount / Pn : amount * Pn;
+        const total = flat === null ? null : shape === 'fixed' ? flat * (sellsJpy ? 1 / (1 - fee) : 1 + fee) : curveTotal === null ? null : (flat * curveTotal) / (1 - fee);
+        const feePart = total === null || flat === null ? null : shape === 'fixed' ? total - flat : total * fee;
         const shared = s.budget && s.amount ? budgetRatio(s.budget, s.balance, now, s.amount) : null;
         return (
           <div className="preview-side" key={s.coin}>
             <div className="spread">
               <span className="inline">
                 <CoinIcon coin={s.coin} size={22} />
-                <b>Sells {s.coin}</b>
-                <span className="muted small">for {other(s.coin)}</span>
+                <b>
+                  You sell {s.coin}, get {pay}
+                </b>
               </span>
               <span className="chip">
-                {shape === 'curve' ? 'Curve' : 'Fixed'} · {feeLabel}
+                {shape === 'curve' ? 'Curve' : 'Fixed'} · {feeLabel} fee
               </span>
             </div>
-            <div className="big gold">
-              {s.amount ? fmt(s.amount) : '0'} <span className="unit">{s.coin}</span>
-            </div>
+            {amount === null ? (
+              <p className="pv-empty">Enter a {s.coin} amount to see your numbers.</p>
+            ) : (
+              <div className="big gold">
+                <span className="pv-label">Up to </span>
+                {fmt(s.amount!)} <span className="unit">{s.coin}</span>
+              </div>
+            )}
             <div className="kv">
-              <span>Trader price</span>
-              <span>{trade}</span>
+              <span>Your price now</span>
+              <span>
+                {start === null ? '—' : (
+                  <>
+                    <b>1 tUSD = {num(start)} tJPY</b>
+                  </>
+                )}
+              </span>
             </div>
+            <p className="pv-note">
+              {start === null
+                ? ''
+                : sellsJpy
+                  ? `Traders pay 1 tUSD and get ${num(start)} tJPY from you.`
+                  : `Traders pay ${num(start)} tJPY and get 1 tUSD from you.`}
+            </p>
             {shape === 'curve' && start !== null && (
               <div className="range">
                 <div className="spread small">
-                  <span className="muted">Price range</span>
+                  <span className="muted">As it sells, your price moves</span>
                   <span className="faint">tJPY per tUSD</span>
                 </div>
                 <div className={`range-track${end === null ? ' open' : ''}`} aria-hidden="true" />
@@ -551,24 +589,55 @@ function Preview({ plan, P, shape, feeBps, depth, expiresAtMs, now }: { plan: Si
                     <b className="num">{num(start)}</b> <span className="faint">now</span>
                   </span>
                   <span>
-                    {end === null ? <span className="faint">never sells out</span> : (
+                    {end === null ? <span className="faint">never fully sells</span> : (
                       <>
-                        <b className="num">{num(end)}</b> <span className="faint">sold out</span>
+                        <b className="num">{num(end)}</b> <span className="faint">all sold</span>
                       </>
                     )}
                   </span>
                 </div>
+                <p className="pv-note">
+                  {sellsJpy
+                    ? 'Each fill makes your tJPY a little dearer: traders get fewer tJPY per tUSD.'
+                    : 'Each fill makes your tUSD a little dearer: traders pay more tJPY per tUSD.'}
+                </p>
+              </div>
+            )}
+            {amount !== null && (
+              <div className="kv pv-total">
+                <span>If all of it sells, you receive</span>
+                <span>
+                  {total === null ? (
+                    <span className="faint">never fully sells</span>
+                  ) : (
+                    <b className="gold">
+                      ≈ {num(total)} {pay}
+                    </b>
+                  )}
+                </span>
+              </div>
+            )}
+            {amount !== null && feePart !== null && total !== null && (
+              <div className="kv">
+                <span>Of which fee you keep</span>
+                <span>
+                  <b>
+                    ≈ {num(feePart)} {pay}
+                  </b>
+                </span>
               </div>
             )}
             <div className="kv">
               <span>Budget</span>
-              <span>{s.budget ? `Existing, ${fmt(s.budget.remaining ?? 0n)} ${s.coin} left` : 'New, capped at this amount'}</span>
+              <span>{s.budget ? `Existing, ${fmt(s.budget.remaining ?? 0n)} ${s.coin} left` : `New, capped at ${amount === null ? 'this amount' : `${fmt(s.amount!)} ${s.coin}`}`}</span>
             </div>
             {shared && (
               <div className="kv">
                 <span>One balance, many markets</span>
                 <span className="gold">
-                  {shared.markets} markets · {shared.ratio.toFixed(1)}× shared
+                  <b>
+                    {shared.markets} markets · {shared.ratio.toFixed(1)}× shared
+                  </b>
                 </span>
               </div>
             )}
@@ -576,8 +645,8 @@ function Preview({ plan, P, shape, feeBps, depth, expiresAtMs, now }: { plan: Si
         );
       })}
       <p className="small muted" style={{ margin: 0, lineHeight: 1.55 }}>
-        Funds stay in your wallet. The executor can pull only through suijin's Move rules, up to each budget, until {when(expiresAtMs)}. Pause
-        or revoke any time in Portfolio.
+        <b className="ink">Funds stay in your wallet.</b> The executor can pull only through suijin's Move rules, up to each budget, until{' '}
+        <b className="ink">{when(expiresAtMs)}</b>. Pause or revoke any time in Portfolio.
       </p>
     </aside>
   );
