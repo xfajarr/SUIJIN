@@ -30,9 +30,30 @@ async function publish(client: SuiGrpcClient, signer: Ed25519Keypair, dir: strin
   return { packageId, created };
 }
 
+/**
+ * Currencies created in `init` wait at the registry address (0xc) until finalize_registration
+ * makes them shared. Without it explorers and GraphQL cannot see the decimals.
+ */
+async function finalizeCurrencies(client: SuiGrpcClient, signer: Ed25519Keypair, coinTypes: string[], currencyIds: string[]) {
+  const tx = new Transaction();
+  coinTypes.forEach((coinType, i) =>
+    tx.moveCall({ target: '0x2::coin_registry::finalize_registration', typeArguments: [coinType], arguments: [tx.object('0xc'), tx.object(currencyIds[i]!)] }),
+  );
+  const r = await client.signAndExecuteTransaction({ transaction: tx, signer, include: { effects: true } });
+  if (r.$kind === 'FailedTransaction') throw new Error(`finalize currencies: ${r.FailedTransaction.status.error?.message}`);
+  await client.waitForTransaction({ result: r });
+  console.log(`finalized coin registry entries (${r.Transaction.digest})`);
+}
+
 export async function deploy(signer: Ed25519Keypair, network: Deployment['network']): Promise<Deployment> {
   const client = new SuiGrpcClient({ network, baseUrl: `https://fullnode.${network}.sui.io:443` });
   const coins = await publish(client, signer, 'mock_coins');
+  await finalizeCurrencies(
+    client,
+    signer,
+    [`${coins.packageId}::tjpy::TJPY`, `${coins.packageId}::tusd::TUSD`],
+    [coins.created('::tjpy::TJPY>'), coins.created('::tusd::TUSD>')],
+  );
   const core = await publish(client, signer, 'suijin');
   return {
     network,
