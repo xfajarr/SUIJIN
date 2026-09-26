@@ -1,9 +1,9 @@
 import { useCurrentAccount } from '@mysten/dapp-kit-react';
-import { mintTestCoins, type CoinKey } from '@suijin/sdk';
+import { type CoinKey } from '@suijin/sdk';
 import { useState } from 'react';
-import { openConnect, other, useAction, useBalances, useQuotes } from '../chain';
-import { AmountPanel, FlipArrows, fmt, parseAmount, pct, toInput } from '../ui';
-import { FlowProgress, QuoteDetails, RateLine, Receipt, RefreshRing, SlippageSettings, Sliders, TradeTabs, settledLine, useOrderFlow } from './trade';
+import { coin, openConnect, useBalances, useQuotes } from '../chain';
+import { AmountPanel, FlipArrows, fmtAmt, parseAmount, pct, toInput } from '../ui';
+import { BalanceHint, FlowProgress, QuoteDetails, RateLine, Receipt, RefreshRing, SlippageSettings, Sliders, TradeTabs, settledLine, useOrderFlow } from './trade';
 
 const REFRESH_MS = 15_000;
 
@@ -11,9 +11,8 @@ export function Swap() {
   const me = useCurrentAccount()?.address ?? '';
   const balances = useBalances();
   const flow = useOrderFlow();
-  const faucet = useAction();
   const [sell, setSell] = useState<CoinKey>('tUSD');
-  const buy = other(sell);
+  const [buy, setBuy] = useState<CoinKey>('tJPY');
   // The amount stays with the field the trader typed in: exact input or exact output.
   const [side, setSide] = useState<'in' | 'out'>('in');
   const [text, setText] = useState('');
@@ -22,7 +21,8 @@ export function Swap() {
   const [picked, setPicked] = useState<string | null>(null);
   const [turns, setTurns] = useState(0);
 
-  const amount = parseAmount(text);
+  // The typed amount belongs to the side it was typed in, so it parses with that token's decimals.
+  const amount = parseAmount(text, coin(side === 'in' ? sell : buy).decimals);
   const idle = flow.step === 'idle';
   const live = useQuotes(
     idle && amount ? { sell, buy, slippageBps, ...(side === 'in' ? { amountIn: amount } : { amountOut: amount }) } : null,
@@ -31,7 +31,7 @@ export function Swap() {
   const quote = idle ? (live.quotes.find((q) => q.strategyId === picked) ?? live.best) : (flow.quote ?? null);
 
   const pay = side === 'in' ? amount : (quote?.quoteIn ?? null);
-  const balance = balances.value?.[sell] ?? null;
+  const balance = balances.value?.address[sell] ?? null;
   const tooMuch = !!me && balance !== null && pay !== null && pay > balance;
 
   const type = (s: 'in' | 'out') => (v: string) => {
@@ -41,10 +41,14 @@ export function Swap() {
   };
   const flip = () => {
     setSell(buy);
+    setBuy(sell);
     setSide(side === 'in' ? 'out' : 'in'); // the typed amount follows its coin
     setPicked(null);
     setTurns((t) => t + 1);
   };
+  // Picking the token already on the other side swaps the two.
+  const pickSell = (k: CoinKey) => (k === buy ? flip() : (setSell(k), setPicked(null)));
+  const pickBuy = (k: CoinKey) => (k === sell ? flip() : (setBuy(k), setPicked(null)));
 
   const cta = (() => {
     if (!me) return { label: 'Connect wallet', onClick: openConnect };
@@ -54,7 +58,7 @@ export function Swap() {
     if (live.error) return { label: 'Quotes unavailable', warn: true };
     if (!quote) return { label: 'Not enough liquidity for this size', warn: true };
     if (tooMuch) return { label: `Not enough ${sell}`, warn: true };
-    if (balances.value?.sui === 0n) return { label: 'Need testnet SUI for gas', warn: true };
+    if (balances.value?.gas === 0n) return { label: 'Need testnet SUI for gas', warn: true };
     // Above 5% impact the route is a thin curve: still allowed, but the trader must mean it.
     if (quote.impactBps >= 500) return { label: `Swap anyway (${pct(quote.impactBps)} price impact)`, risky: true, onClick: () => flow.execute(quote, me) };
     return { label: 'Swap', onClick: () => flow.execute(quote, me) };
@@ -103,11 +107,13 @@ export function Swap() {
           <AmountPanel
             label="Sell"
             coin={sell}
-            value={side === 'in' ? text : quote ? fmt(quote.quoteIn) : ''}
+            value={side === 'in' ? text : quote ? fmtAmt(quote.quoteIn, sell) : ''}
             onChange={idle ? type('in') : undefined}
-            onCoin={idle ? flip : undefined}
+            onPick={idle ? pickSell : undefined}
+            exclude={buy}
+            balances={balances.value?.address}
             balance={me ? balance : undefined}
-            onMax={idle && balance ? () => type('in')(toInput(balance)) : undefined}
+            onMax={idle && balance ? () => type('in')(toInput(balance, coin(sell).decimals)) : undefined}
             loading={side === 'out' && live.loading}
             invalid={tooMuch}
             autoFocus
@@ -121,10 +127,12 @@ export function Swap() {
             label="Buy"
             coin={buy}
             outline
-            value={side === 'out' ? text : quote ? fmt(quote.baseOut) : ''}
+            value={side === 'out' ? text : quote ? fmtAmt(quote.baseOut, buy) : ''}
             onChange={idle ? type('out') : undefined}
-            onCoin={idle ? flip : undefined}
-            balance={me ? (balances.value?.[buy] ?? null) : undefined}
+            onPick={idle ? pickBuy : undefined}
+            exclude={sell}
+            balances={balances.value?.address}
+            balance={me ? (balances.value?.address[buy] ?? null) : undefined}
             loading={side === 'in' && live.loading}
           />
         </div>
@@ -153,20 +161,10 @@ export function Swap() {
             <button type="button" className={`cta${cta.warn ? ' warn' : ''}${cta.risky ? ' risky' : ''}`} disabled={!cta.onClick} onClick={cta.onClick}>
               {cta.label}
             </button>
-            {me && balance === 0n && (
-              <button
-                type="button"
-                className="link-btn"
-                style={{ alignSelf: 'center' }}
-                disabled={!!faucet.busy}
-                onClick={() => faucet.act('Minting test tokens', () => mintTestCoins({ tusd: 1_000_000_000n, tjpy: 150_000_000_000n }), { done: 'Added 1,000 tUSD and 150,000 tJPY' })}
-              >
-                {faucet.busy ? 'Minting…' : `No ${sell} yet? Get test tokens`}
-              </button>
-            )}
+            <BalanceHint coin={sell} balances={balances.value} me={me} />
           </>
         ) : (
-          <FlowProgress flow={flow} payLabel={quote ? `${toInput(quote.quoteIn)} ${sell}` : sell} />
+          <FlowProgress flow={flow} payLabel={quote ? `${toInput(quote.quoteIn, coin(sell).decimals)} ${sell}` : sell} />
         )}
       </section>
 
