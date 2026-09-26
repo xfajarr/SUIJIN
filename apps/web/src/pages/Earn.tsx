@@ -24,6 +24,7 @@ import {
   TxLink,
   cleanAmount,
   fmtAmt,
+  fmtPrice,
   parseAmount,
   parsePrice,
   priceText,
@@ -456,14 +457,32 @@ export function Earn() {
           ) : (
             <>
               <Step n={1} title="What you offer">
-                <div className="knob">
-                  <span>Pair</span>
-                  <span className="pair-pick">
-                    <TokenPicker label="First token of the pair" value={unit} exclude={priced} onPick={(k) => setPair(k, priced)} balances={balances.value?.address} />
-                    <span className="faint">/</span>
-                    <TokenPicker label="Second token of the pair" value={priced} exclude={unit} onPick={(k) => setPair(unit, k)} balances={balances.value?.address} />
+                <div className="pair-cards" role="group" aria-label="Pair">
+                  <TokenPicker
+                    variant="card"
+                    caption="Token A"
+                    label="First token of the pair"
+                    value={unit}
+                    exclude={priced}
+                    onPick={(k) => setPair(k, priced)}
+                    balances={balances.value?.address}
+                  />
+                  <span className="pair-link" aria-hidden="true">
+                    /
                   </span>
+                  <TokenPicker
+                    variant="card"
+                    caption="Token B"
+                    label="Second token of the pair"
+                    value={priced}
+                    exclude={unit}
+                    onPick={(k) => setPair(unit, k)}
+                    balances={balances.value?.address}
+                  />
                 </div>
+                <p className="pair-rate">
+                  {market.loading ? 'Reading the market…' : market.mid !== null ? `Market: 1 ${unit} = ${fmtPrice(market.mid)} ${priced}` : `No ${unit}/${priced} market yet: yours would be the first`}
+                </p>
                 <Options label="What you offer" value={sides} options={sideCards(unit, priced)} onChange={setSides} />
               </Step>
 
