@@ -46,10 +46,14 @@ async function quotes(client: SuiGrpcClient, req: QuoteRequest) {
  * Body: { sell: 'tUSD' | coin type, buy: 'tJPY' | coin type, amountIn | amountOut: integer string, slippageBps?: 0..1000 }.
  * The original { quoteIn } body still means "pay tUSD, receive tJPY".
  */
+/** A listed symbol or type, or any well-formed coin type: markets exist for whatever providers list. */
+const COIN_TYPE = /^0x[0-9a-fA-F]{1,64}::\w+::\w+$/;
+const coinType = (v: string) => resolveCoin(v) ?? (COIN_TYPE.test(v) ? { type: v } : undefined);
+
 function parseQuoteRequest(body: Record<string, unknown>): QuoteRequest | string {
-  const sell = resolveCoin(String(body.sell ?? 'tUSD'));
-  const buy = resolveCoin(String(body.buy ?? 'tJPY'));
-  if (!sell || !buy || sell.type === buy.type) return 'sell and buy must be two different coins (tUSD, tJPY)';
+  const sell = coinType(String(body.sell ?? 'tUSD'));
+  const buy = coinType(String(body.buy ?? 'tJPY'));
+  if (!sell || !buy || sameType(sell.type, buy.type)) return 'sell and buy must be two different coins: a listed symbol (tUSD, SUI, USDC, …) or a full coin type';
   const amountIn = body.amountIn ?? body.quoteIn;
   const amountOut = body.amountOut;
   const isInt = (v: unknown) => typeof v === 'string' && /^[1-9]\d*$/.test(v);
