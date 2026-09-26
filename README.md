@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/suijin-logo.png" alt="Suijin logo" width="160">
+  <img src="docs/assets/suijin-icon.png" alt="Suijin" width="160">
 </p>
 
 <h1 align="center">Suijin</h1>
