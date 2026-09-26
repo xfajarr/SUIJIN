@@ -1,4 +1,4 @@
-import { Transaction, type TransactionResult } from '@mysten/sui/transactions';
+import { Transaction, coinWithBalance, type TransactionResult } from '@mysten/sui/transactions';
 import { DEPLOYMENT, defaultPair, typesOf, type Deployment, type Pair } from './config';
 
 // Every builder returns an unsigned Transaction. `pair` defaults to the original market
@@ -258,5 +258,16 @@ export function buildFill(p: FillParams, d: Deployment = DEPLOYMENT): Transactio
       tx.object.clock(),
     ],
   });
+  return tx;
+}
+
+/**
+ * Moves `amount` of a coin held as Coin objects into the owner's own address balance, the only
+ * place Allowances can spend from. Nothing leaves the owner; SUI is split from the gas coin.
+ */
+export function depositToBalance(p: { coinType: string; amount: bigint; owner: string }): Transaction {
+  const tx = new Transaction();
+  tx.setSender(p.owner);
+  tx.moveCall({ target: '0x2::coin::send_funds', typeArguments: [p.coinType], arguments: [coinWithBalance({ type: p.coinType, balance: p.amount }), tx.pure.address(p.owner)] });
   return tx;
 }

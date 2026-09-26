@@ -1,5 +1,5 @@
 import type { SuiGrpcClient } from '@mysten/sui/grpc';
-import { DEPLOYMENT, GRAPHQL_URL, typesOf, type Deployment } from './config';
+import { DEPLOYMENT, GRAPHQL_URL, typesOf, type CoinInfo, type Deployment } from './config';
 import { parseAllowance, parseOrder, parseStrategy, typeArgs, type AllowanceState, type OrderState, type StrategyState } from './state';
 
 // Object reads go through GraphQL: one stable JSON shape. Balances and execution go through gRPC.
@@ -171,4 +171,26 @@ export async function freshOrder(client: SuiGrpcClient, id: string): Promise<Ord
 export async function addressBalance(client: SuiGrpcClient, owner: string, coinType: string): Promise<bigint> {
   const { balance } = await client.getBalance({ owner, coinType });
   return BigInt(balance.addressBalance);
+}
+
+/**
+ * Registry entry for any coin type, from its on-chain metadata (Coin Registry or CoinMetadata).
+ * null when the type has no metadata, so it is not a coin people can hold.
+ */
+export async function fetchCoinInfo(coinType: string, d: Deployment = DEPLOYMENT): Promise<CoinInfo | null> {
+  const data = await gql<{ coinMetadata: { symbol: string; name: string; decimals: number; iconUrl: string | null } | null }>(
+    'query($t: String!) { coinMetadata(coinType: $t) { symbol name decimals iconUrl } }',
+    { t: coinType },
+    d,
+  );
+  const m = data.coinMetadata;
+  if (!m) return null;
+  return { key: m.symbol, type: coinType, symbol: m.symbol, name: m.name, decimals: m.decimals, ...(m.iconUrl ? { iconUrl: m.iconUrl } : {}) };
+}
+
+/** Whole balance of a coin: the address-balance part Allowances can spend, and the part still in Coin objects. */
+export async function splitBalance(client: SuiGrpcClient, owner: string, coinType: string): Promise<{ address: bigint; coins: bigint }> {
+  const { balance } = await client.getBalance({ owner, coinType });
+  const address = BigInt(balance.addressBalance);
+  return { address, coins: BigInt(balance.balance) - address };
 }
