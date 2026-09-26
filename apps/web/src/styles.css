@@ -45,10 +45,13 @@ a:hover { color: var(--ink); }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; justify-self: start; }
 .brand img { width: 40px; height: 40px; mix-blend-mode: screen; }
 .brand span { font-family: 'Pixelify Sans', ui-monospace, monospace; font-size: 26px; line-height: 1; }
-.nav { display: inline-flex; gap: 2px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); backdrop-filter: blur(14px); }
-.nav a { padding: 8px 16px; border-radius: 999px; color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px; transition: background-color 0.2s var(--ease), color 0.2s var(--ease); white-space: nowrap; }
-.nav a:hover { color: var(--ink); background: var(--accent-soft); }
-.nav a[aria-current='page'] { background: var(--accent); color: var(--accent-ink); }
+.nav { position: relative; display: inline-flex; gap: 2px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); backdrop-filter: blur(14px); }
+.nav a { position: relative; z-index: 1; padding: 8px 16px; border-radius: 999px; color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px; transition: background-color 0.2s var(--ease), color 0.2s var(--ease); white-space: nowrap; }
+.nav a:not([aria-current='page']):hover { color: var(--ink); background: var(--accent-soft); }
+/* The active colour lands just after the pill arrives, so text never sits dark on the dark track. */
+.nav a[aria-current='page'] { color: var(--accent-ink); transition: color 0.2s var(--ease) 0.14s; }
+.nav-pill { position: absolute; top: 4px; bottom: 4px; left: 0; border-radius: 999px; background: var(--accent); }
+.nav-pill.animate { transition: transform 0.38s var(--ease), width 0.38s var(--ease); }
 /* Header utilities stay quiet: the wallet button is the only filled control up here. */
 .tool { display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 12px; border: 0; border-radius: 12px; background: transparent; color: var(--muted); font-size: 14px; font-weight: 600; text-decoration: none; transition: background-color 0.18s var(--ease), color 0.18s var(--ease); }
 .tool:hover:not(:disabled) { background: rgba(232, 251, 247, 0.07); color: var(--ink); }

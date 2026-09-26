@@ -1,7 +1,7 @@
 import { useCurrentAccount } from '@mysten/dapp-kit-react';
 import { ConnectButton, ConnectModal } from '@mysten/dapp-kit-react/ui';
 import { DEPLOYMENT, mintTestCoins } from '@suijin/sdk';
-import { useEffect, useState, type ComponentType } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ComponentType } from 'react';
 import { SERVER, connectModal, explorer, fetchHealth, useAction, useBalances, usePoll } from './chain';
 import { Earn } from './pages/Earn';
 import { Limit } from './pages/Limit';
@@ -28,7 +28,7 @@ export function App() {
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
-  const { Page } = PAGES.find((p) => p.path === path) ?? PAGES[0]!;
+  const page = PAGES.find((p) => p.path === path) ?? PAGES[0]!;
 
   return (
     <div className="app">
@@ -37,25 +37,53 @@ export function App() {
           <img src="/logo.png" alt="" />
           <span>Suijin</span>
         </a>
-        <nav className="nav" aria-label="Main">
-          {PAGES.map((p) => (
-            <a key={p.path} href={`#/${p.path}`} aria-current={p.path === path ? 'page' : undefined}>
-              {p.label}
-            </a>
-          ))}
-        </nav>
+        <Nav current={page.path} />
         <div className="topbar-actions">
           <Faucet />
           <ConnectButton />
         </div>
       </header>
-      <main key={path}>
-        <Page />
+      <main key={page.path}>
+        <page.Page />
       </main>
       <Status />
       <ConnectModal ref={connectModal as never} />
       <Toasts />
     </div>
+  );
+}
+
+/** Page tabs with one pill that slides to the current page. */
+function Nav({ current }: { current: string }) {
+  const ref = useRef<HTMLElement>(null);
+  const [pill, setPill] = useState({ x: 0, w: 0, animate: false });
+  const place = (animate: boolean) => {
+    const a = ref.current?.querySelector<HTMLElement>('a[aria-current="page"]');
+    if (a) setPill({ x: a.offsetLeft, w: a.offsetWidth, animate });
+    return a;
+  };
+  const mounted = useRef(false);
+  useLayoutEffect(() => {
+    const a = place(mounted.current);
+    if (mounted.current) a?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); // phones: keep the tab in view
+    mounted.current = true;
+  }, [current]);
+  useEffect(() => {
+    // Web fonts and resizes change tab widths: re-measure without animating.
+    const settle = () => place(false);
+    void document.fonts?.ready.then(settle);
+    window.addEventListener('resize', settle);
+    return () => window.removeEventListener('resize', settle);
+  }, []);
+  return (
+    <nav className="nav" aria-label="Main" ref={ref}>
+      <span className={`nav-pill${pill.animate ? ' animate' : ''}`} style={{ width: pill.w, transform: `translateX(${pill.x}px)` }} aria-hidden="true" />
+      {PAGES.map((p) => (
+        <a key={p.path} href={`#/${p.path}`} aria-current={p.path === current ? 'page' : undefined}>
+          {p.label}
+        </a>
+      ))}
+    </nav>
   );
 }
 
