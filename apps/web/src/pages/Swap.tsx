@@ -154,12 +154,12 @@ export function Swap() {
             {me && balance === 0n && (
               <button
                 type="button"
-                className="btn ghost sm"
+                className="link-btn"
                 style={{ alignSelf: 'center' }}
                 disabled={!!faucet.busy}
                 onClick={() => faucet.act('Minting test tokens', () => mintTestCoins({ tusd: 1_000_000_000n, tjpy: 150_000_000_000n }), { done: 'Added 1,000 tUSD and 150,000 tJPY' })}
               >
-                {faucet.busy ? 'Minting…' : `Get test ${sell} from the faucet`}
+                {faucet.busy ? 'Minting…' : `No ${sell} yet? Get test tokens`}
               </button>
             )}
           </>
@@ -168,20 +168,9 @@ export function Swap() {
         )}
       </section>
 
-      <ol className="explainer" aria-label="How a swap settles">
-        <li>
-          <b>Sign once</b>
-          <span>An exact-cap approval and your order, in one transaction.</span>
-        </li>
-        <li>
-          <b>Settled atomically</b>
-          <span>The executor moves both sides through Sui allowances in one PTB.</span>
-        </li>
-        <li>
-          <b>No pools, no deposits</b>
-          <span>Providers quote from their own wallets. Nothing is locked.</span>
-        </li>
-      </ol>
+      <p className="note">
+        Settles in one transaction through Sui allowances. Providers quote from their own wallets, so nothing sits in a pool.
+      </p>
     </div>
   );
 }

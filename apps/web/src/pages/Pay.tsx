@@ -73,7 +73,12 @@ export function Pay() {
       {request.to && idle && (
         <p className="banner" role="note">
           Payment request from <span className="mono">{short(request.to)}</span>
-          {parseAmount(request.amount) && ` for ${fmtCoin(parseAmount(request.amount)!, request.coin)}`}
+          {parseAmount(request.amount) && (
+            <>
+              {' '}
+              for <b>{fmtCoin(parseAmount(request.amount)!, request.coin)}</b>
+            </>
+          )}
         </p>
       )}
       <section className="card" aria-busy={live.loading}>

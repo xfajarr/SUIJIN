@@ -276,14 +276,9 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; 
 .receipt-body { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 18px; }
 .receipt-body p { margin: 0; }
 .receipt .cta { margin-top: 10px; }
-.explainer { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; counter-reset: step; }
-.explainer li { display: flex; flex-direction: column; gap: 4px; padding: 12px; border-radius: 14px; border: 1px solid var(--line); font-size: 12px; color: var(--muted); counter-increment: step; animation: rise 0.45s var(--ease) both; }
-.explainer li:nth-child(2) { animation-delay: 0.06s; }
-.explainer li:nth-child(3) { animation-delay: 0.12s; }
-.explainer li::before { content: counter(step, decimal-leading-zero); font-family: 'Geist Mono', ui-monospace, monospace; color: var(--accent); font-size: 11px; }
-.explainer b { color: var(--ink); font-size: 13px; font-weight: 600; }
-@media (max-width: 520px) { .explainer { grid-template-columns: 1fr; } }
-.banner { margin: 0; padding: 10px 14px; border-radius: 14px; background: var(--gold-soft); border: 1px solid rgba(244, 182, 60, 0.3); color: var(--gold); font-size: 14px; animation: rise 0.3s var(--ease) both; }
+.note { margin: 0; align-self: center; max-width: 46ch; text-align: center; font-size: 13px; line-height: 1.55; color: var(--faint); }
+.banner { margin: 0; text-align: center; font-size: 14px; color: var(--muted); animation: rise 0.3s var(--ease) both; }
+.banner b { color: var(--ink); font-weight: 600; }
 
 /* ---------- quote refresh ring ---------- */
 .ring { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); padding: 0; }
