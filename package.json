@@ -1,0 +1,19 @@
+{
+  "name": "suijin",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*", "apps/*", "scripts"],
+  "scripts": {
+    "test:move": "cd contracts/suijin && sui move test",
+    "test:ts": "bun test packages/sdk apps/server",
+    "typecheck": "tsc -p tsconfig.json && tsc -p apps/web/tsconfig.json",
+    "deploy": "bun scripts/deploy.ts testnet",
+    "e2e": "bun scripts/e2e.ts",
+    "server": "bun apps/server/src/index.ts",
+    "web": "cd apps/web && bunx vite"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.0",
+    "typescript": "^5.9.0"
+  }
+}
