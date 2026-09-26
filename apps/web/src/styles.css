@@ -62,6 +62,7 @@ a:hover { color: var(--ink); }
 @media (max-width: 860px) {
   .topbar { grid-template-columns: 1fr auto; padding: 12px 16px; row-gap: 12px; }
   .nav { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; min-width: 0; justify-content: space-between; overflow-x: auto; scrollbar-width: none; }
+  .nav a { flex: 1; text-align: center; }
 }
 @media (max-width: 480px) {
   .brand span { display: none; } /* logo only: the wallet button needs the room */
