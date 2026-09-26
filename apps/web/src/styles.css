@@ -114,6 +114,7 @@ button { font: inherit; font-weight: 600; cursor: pointer; }
 .cta:active:not(:disabled) { transform: scale(0.985); }
 .cta:disabled { background: rgba(232, 251, 247, 0.08); color: var(--faint); cursor: default; }
 .cta.warn:disabled { color: var(--danger); background: var(--danger-soft); }
+.cta.risky, .cta.risky:hover:not(:disabled) { background: var(--danger); color: #1d0503; }
 button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 label.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }

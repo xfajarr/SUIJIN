@@ -2,7 +2,7 @@ import { useCurrentAccount } from '@mysten/dapp-kit-react';
 import { mintTestCoins, type CoinKey } from '@suijin/sdk';
 import { useState } from 'react';
 import { openConnect, other, useAction, useBalances, useQuotes } from '../chain';
-import { AmountPanel, FlipArrows, fmt, parseAmount, toInput } from '../ui';
+import { AmountPanel, FlipArrows, fmt, parseAmount, pct, toInput } from '../ui';
 import { FlowProgress, QuoteDetails, RateLine, Receipt, RefreshRing, SlippageSettings, Sliders, TradeTabs, settledLine, useOrderFlow } from './trade';
 
 const REFRESH_MS = 15_000;
@@ -55,6 +55,8 @@ export function Swap() {
     if (!quote) return { label: 'Not enough liquidity for this size', warn: true };
     if (tooMuch) return { label: `Not enough ${sell}`, warn: true };
     if (balances.value?.sui === 0n) return { label: 'Need testnet SUI for gas', warn: true };
+    // Above 5% impact the route is a thin curve: still allowed, but the trader must mean it.
+    if (quote.impactBps >= 500) return { label: `Swap anyway (${pct(quote.impactBps)} price impact)`, risky: true, onClick: () => flow.execute(quote, me) };
     return { label: 'Swap', onClick: () => flow.execute(quote, me) };
   })();
 
@@ -148,7 +150,7 @@ export function Swap() {
               />
             )}
             {live.error && <p className="hint bad">{live.error}</p>}
-            <button type="button" className={`cta${cta.warn ? ' warn' : ''}`} disabled={!cta.onClick} onClick={cta.onClick}>
+            <button type="button" className={`cta${cta.warn ? ' warn' : ''}${cta.risky ? ' risky' : ''}`} disabled={!cta.onClick} onClick={cta.onClick}>
               {cta.label}
             </button>
             {me && balance === 0n && (
