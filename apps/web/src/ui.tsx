@@ -1,5 +1,5 @@
 import { fetchCoinInfo, type CoinKey } from '@suijin/sdk';
-import { useId, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useId, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
 import { addToken, coin, explorer, friendlyError, toast, useTokens } from './chain';
 import { amt, cleanAmount, rate, short } from './format';
 
@@ -42,10 +42,27 @@ const COIN_TYPE = /^0x[0-9a-fA-F]{1,64}::\w+::\w+$/;
  * Token list in a modal: search by symbol or name, or paste any coin type to add it from its
  * on-chain metadata. `exclude` is the other side of the pair.
  */
-export function TokenPicker(p: { value: CoinKey; exclude?: CoinKey; onPick: (key: CoinKey) => void; balances?: Record<CoinKey, bigint> | null; label: string }) {
+export function TokenPicker(p: {
+  value: CoinKey;
+  exclude?: CoinKey;
+  onPick: (key: CoinKey) => void;
+  balances?: Record<CoinKey, bigint> | null;
+  label: string;
+  /** 'card': a large trigger with the token name, for choosing a pair. */
+  variant?: 'chip' | 'card';
+  /** Small caption on the card trigger, e.g. "Base". */
+  caption?: string;
+}) {
   const list = useTokens();
   const dialog = useRef<HTMLDialogElement>(null);
+  const search = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState('');
+  // showModal focuses the first button (close); start in the search field instead.
+  const open = () => {
+    setQ('');
+    dialog.current?.showModal();
+    search.current?.focus();
+  };
   const [adding, setAdding] = useState(false);
   const query = q.trim();
   const isType = COIN_TYPE.test(query);
@@ -68,22 +85,36 @@ export function TokenPicker(p: { value: CoinKey; exclude?: CoinKey; onPick: (key
   };
   return (
     <>
-      <button type="button" className="token token-btn" onClick={() => (setQ(''), dialog.current?.showModal())} aria-label={`${p.value}, ${p.label}`}>
-        <CoinIcon coin={p.value} size={26} />
-        {p.value}
-        <Chevron />
-      </button>
+      {p.variant === 'card' ? (
+        <button type="button" className="token-card" onClick={open} aria-label={`${p.value}, ${p.label}`}>
+          <CoinIcon coin={p.value} size={36} />
+          <span className="token-card-text">
+            {p.caption && <small>{p.caption}</small>}
+            <b>{p.value}</b>
+            <span>{coin(p.value).name}</span>
+          </span>
+          <Chevron />
+        </button>
+      ) : (
+        <button type="button" className="token token-btn" onClick={open} aria-label={`${p.value}, ${p.label}`}>
+          <CoinIcon coin={p.value} size={26} />
+          {p.value}
+          <Chevron />
+        </button>
+      )}
       <dialog ref={dialog} className="picker" aria-label={p.label} onClick={(e) => e.target === dialog.current && dialog.current?.close()}>
         <div className="picker-head">
           <strong>{p.label}</strong>
-          <button type="button" className="t-close" aria-label="Close" onClick={() => dialog.current?.close()}>
-            ×
+          <button type="button" className="icon-x" aria-label="Close" onClick={() => dialog.current?.close()}>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
           </button>
         </div>
-        <input className="picker-search" placeholder="Search, or paste a coin type 0x…::coin::COIN" value={q} onChange={(e) => setQ(e.target.value)} autoFocus spellCheck={false} />
+        <input ref={search} className="picker-search" placeholder="Search, or paste a coin type 0x…::coin::COIN" value={q} onChange={(e) => setQ(e.target.value)} spellCheck={false} />
         <ul className="picker-list">
-          {shown.map((t) => (
-            <li key={t.key}>
+          {shown.map((t, i) => (
+            <li key={t.key} style={{ '--i': Math.min(i, 8) } as CSSProperties}>
               <button type="button" aria-current={t.key === p.value || undefined} onClick={() => pick(t.key)}>
                 <CoinIcon coin={t.key} size={32} />
                 <span>
