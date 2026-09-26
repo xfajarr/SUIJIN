@@ -1,6 +1,7 @@
 import type { SuiGrpcClient } from '@mysten/sui/grpc';
 import type { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 import { buildFill, getAllowance, getOrder, getStrategy } from '@suijin/sdk';
+import { eventually } from './eventually';
 import { planFill } from './plan';
 
 export type FillOutcome = { ok: true; digest: string } | { ok: false; error: string };
@@ -20,10 +21,11 @@ export function fillOrder(client: SuiGrpcClient, signer: Ed25519Keypair, orderId
 }
 
 async function settle(client: SuiGrpcClient, signer: Ed25519Keypair, orderId: string, takerAllowanceId: string): Promise<FillOutcome> {
-  const order = await getOrder(orderId);
+  // The web app asks for a fill right after the order tx lands; the indexer can be a few seconds behind.
+  const order = await eventually(() => getOrder(orderId));
   const [strategy, payment] = await Promise.all([
     order ? getStrategy(order.strategyId) : null,
-    getAllowance(takerAllowanceId),
+    eventually(() => getAllowance(takerAllowanceId)),
   ]);
   const plan = planFill(order, strategy, payment, takerAllowanceId, Date.now());
   if (!plan.ok) return plan;
