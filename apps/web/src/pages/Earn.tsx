@@ -429,11 +429,6 @@ export function Earn() {
                 <div className="fieldset">
                   <span>Depth</span>
                   <Options label="Depth" value={depth} options={DEPTHS} onChange={setDepth} />
-                  <span className="hint">
-                    {depth === 1
-                      ? 'Spread over every price. It never fully sells out.'
-                      : `Depth ${depth}× your budget: tighter prices, and the price moves at most ${num((depth / (depth - 1)) ** 2)}× before it sells out.`}
-                  </span>
                 </div>
               )}
               {plan.map((s) => (
