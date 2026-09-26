@@ -45,7 +45,6 @@ export function App() {
           ))}
         </nav>
         <div className="topbar-actions">
-          <span className="net">Testnet</span>
           <Faucet />
           <ConnectButton />
         </div>
@@ -60,6 +59,12 @@ export function App() {
   );
 }
 
+const Drop = () => (
+  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <path d="M8 1.8S3.6 6.6 3.6 9.7a4.4 4.4 0 008.8 0C12.4 6.6 8 1.8 8 1.8z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+  </svg>
+);
+
 /** Test tokens in one click; points to the SUI faucet first when there is no gas. */
 function Faucet() {
   const account = useCurrentAccount();
@@ -68,15 +73,16 @@ function Faucet() {
   if (!account) return null;
   if (balances.value?.sui === 0n) {
     return (
-      <a className="btn ghost sm" href={`https://faucet.sui.io/?address=${account.address}`} target="_blank" rel="noreferrer" title="Get testnet SUI for gas">
-        Get SUI ↗
+      <a className="tool" href={`https://faucet.sui.io/?address=${account.address}`} target="_blank" rel="noreferrer" title="Get testnet SUI for gas">
+        <Drop />
+        Get SUI
       </a>
     );
   }
   return (
     <button
       type="button"
-      className="btn ghost sm"
+      className="tool"
       disabled={!!busy}
       title="Mint 1,000 tUSD and 150,000 tJPY to your wallet"
       onClick={() =>
@@ -85,6 +91,7 @@ function Faucet() {
         })
       }
     >
+      <Drop />
       {busy ? 'Minting…' : 'Faucet'}
     </button>
   );
