@@ -3,65 +3,37 @@ import { useEffect, useRef, useState } from 'react'
 // Scroll-driven stack: the section is tall, its frame sticks, and each card slides up over the
 // previous one until only a header strip of it shows.
 
-type Row = [string, string, ('teal' | 'gold')?]
-type Card = { id: string; tab: string; title: string; body: string; head: string; code?: string[]; rows?: Row[] }
+// Screenshots of the live testnet app (public/app), one per product.
+type Card = { id: string; tab: string; title: string; body: string; shot: string }
 
 const CARDS: Card[] = [
   {
     id: 'earn',
+    shot: '/app/earn.png',
     tab: 'Earn',
     title: 'Earn without depositing',
     body: 'Grant a capped, expiring budget and open fixed or curve markets on it. Your coins stay in your wallet and every fill pays you straight back.',
-    head: 'strategy.move',
-    code: [
-      'strategy::create_curve<TJPY, TUSD>(',
-      '  maker_allowance,   // 1,000,000 tJPY cap',
-      '  virtual_base,      // budget × 20',
-      '  virtual_quote,     // starts at 150.41',
-      '  30,                // fee_bps',
-      '  max_base_per_fill,',
-      '  expiry_ms,         // 24 h',
-      ')',
-    ],
   },
   {
     id: 'swap',
+    shot: '/app/swap.png',
     tab: 'Swap',
     title: 'Best price across every market',
     body: 'Quotes read every budget fresh from a fullnode, so the price you see is the price Move recomputes at settlement.',
-    head: 'Quote · pay 10 tUSD',
-    rows: [
-      ['Fixed · 0.05%', '1,503.35 tJPY', 'gold'],
-      ['Curve · 0.30%', '1,499.02 tJPY'],
-      ['Fixed · 1.00%', '1,489.10 tJPY'],
-      ['Min received', '1,488.32 tJPY', 'teal'],
-    ],
   },
   {
     id: 'pay',
+    shot: '/app/pay.png',
     tab: 'Pay',
     title: 'Pay in the coin they want',
     body: 'Send an exact amount to a merchant in their currency from the one you hold. They get at least what they asked for, or the payment reverts.',
-    head: 'Payment request',
-    rows: [
-      ['Merchant gets', '1,500 tJPY', 'gold'],
-      ['You pay', '≤ 10.08 tUSD'],
-      ['Approval', 'exact · 5 min'],
-      ['Settles', 'one PTB', 'teal'],
-    ],
   },
   {
     id: 'limit',
+    shot: '/app/limit.png',
     tab: 'Limit',
     title: 'Limit orders that never leave',
     body: 'Sell at your price and wait. Coins stay in your address until a trader fills you, in part or in full. Pause or revoke any time.',
-    head: 'Limit order',
-    rows: [
-      ['Sell', '500 tUSD'],
-      ['At', '152.00 tJPY', 'gold'],
-      ['Filled', '120 / 500'],
-      ['Custody', 'your wallet', 'teal'],
-    ],
   },
 ]
 
@@ -87,10 +59,14 @@ export default function Products() {
         return Math.round(height + strip + (i * strip - height - strip) * t)
       })
       cards.forEach((card, i) => {
+        // Each card is as tall as the space left under the strips above it, so its bottom sits
+        // on the stack's bottom edge at rest; the clip hides whatever the next card covers.
+        const own = height - i * strip
         const next = ys[i + 1]
-        const visible = next === undefined ? height : Math.max(strip, Math.min(height, next + 2))
+        const visible = next === undefined ? own : Math.max(strip, Math.min(own, next - ys[i] + 2))
+        card.style.height = `${own}px`
         card.style.setProperty('--card-y', `${ys[i]}px`)
-        card.style.setProperty('--card-clip', `${Math.max(0, height - visible)}px`)
+        card.style.setProperty('--card-clip', `${Math.max(0, own - visible)}px`)
         card.style.zIndex = String(i + 1)
       })
       setActive(Math.round(raw))
@@ -140,36 +116,7 @@ export default function Products() {
                 <p>{c.body}</p>
               </div>
               <div className="product-visual">
-                <div className={`code-window${c.rows ? ' metric' : ''}`}>
-                  <div className="code-bar">
-                    <span />
-                    <span />
-                    <span />
-                    <em>{c.head}</em>
-                  </div>
-                  {c.code ? (
-                    <pre>
-                      <code>
-                        {c.code.map((line, n) => (
-                          <span key={n}>
-                            <i>{String(n + 1).padStart(2, '0')}</i>
-                            {line}
-                            {'\n'}
-                          </span>
-                        ))}
-                      </code>
-                    </pre>
-                  ) : (
-                    <dl>
-                      {c.rows!.map(([k, v, tone]) => (
-                        <div key={k}>
-                          <dt>{k}</dt>
-                          <dd className={tone}>{v}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                  )}
-                </div>
+                <img src={c.shot} alt={`Suijin ${c.tab} screen on Sui testnet`} loading="lazy" decoding="async" />
               </div>
             </article>
           ))}
