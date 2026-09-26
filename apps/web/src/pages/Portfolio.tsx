@@ -259,7 +259,7 @@ export function Portfolio() {
 
       <section className="card pf-summary" aria-label="Summary">
         <div className="pf-group">
-          <h2>Wallet</h2>
+          <h2>Balances</h2>
           <div className="pf-balances">
             {COIN_KEYS.map((c) => (
               <div key={c} className="pf-balance">
