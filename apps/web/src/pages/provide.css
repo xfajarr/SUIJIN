@@ -34,6 +34,19 @@
 .pv-note { margin: -4px 0 0; font-size: 12px; line-height: 1.45; color: var(--faint); }
 .pv-total { padding-top: 8px; border-top: 1px dashed var(--line); font-size: 14px; }
 .pv-total b { font-size: 16px; }
+/* price chart in the preview: price vs how much has sold */
+.pchart { margin: 2px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.pchart-plot { position: relative; height: 120px; touch-action: pan-y; cursor: crosshair; }
+.pchart-plot svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.pchart-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.pchart-ref { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 4; }
+.pchart-cross { stroke: var(--line-strong); stroke-width: 1; }
+.pchart-dot { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px #071614; pointer-events: none; }
+.pchart-reflabel { position: absolute; right: 0; transform: translateY(-120%); font-size: 11px; color: var(--muted); pointer-events: none; }
+.pchart-axis { color: var(--muted); }
+.pchart-tip { margin: 0; font-size: 12px; line-height: 1.45; color: var(--faint); }
+.pchart-tip b { color: var(--ink); }
+.pchart-tip b.gold { color: var(--gold); }
 /* curve price range in the preview: now (teal) to sold out (gold) */
 .range { display: flex; flex-direction: column; gap: 6px; padding: 4px 0; }
 .range-track { height: 6px; border-radius: 999px; background: linear-gradient(90deg, var(--accent), var(--gold)); }

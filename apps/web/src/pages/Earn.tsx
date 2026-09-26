@@ -4,6 +4,7 @@ import { useEffect, useId, useState, type ReactNode } from 'react';
 import { COINS, explorer, friendlyError, openConnect, other, toast, useBalances, useNow, usePositions, useQuotes, useRun, type Budget } from '../chain';
 import { AmountPanel, Check, CoinIcon, Options, Segmented, Skeleton, Steps, TxLink, cleanAmount, fmt, parseAmount, toInput, type StepState } from '../ui';
 import { budgetRatio } from './Portfolio';
+import { PriceChart } from './PriceChart';
 import './provide.css';
 
 const HOUR = 3_600_000;
@@ -503,8 +504,6 @@ function SideBudget({ s, connected, onText, onReuse }: { s: Side; connected: boo
 function Preview({ plan, P, shape, feeBps, depth, expiresAtMs, now }: { plan: Side[]; P: bigint | null; shape: Shape; feeBps: number; depth: number; expiresAtMs: number; now: number }) {
   const Pn = P !== null && P > 0n ? Number(P) / 1e6 : null;
   const fee = feeBps / 10_000;
-  // Price multiple once the whole budget is sold: (m / (m - 1))² on a curve with m× virtual depth.
-  const move = depth > 1 ? (depth / (depth - 1)) ** 2 : null;
   // Selling all of a budget off a curve costs traders m/(m-1) times the no-impact amount.
   const curveTotal = depth > 1 ? depth / (depth - 1) : null;
   const feeLabel = FEES.find((f) => f.value === feeBps)?.title;
@@ -532,7 +531,6 @@ function Preview({ plan, P, shape, feeBps, depth, expiresAtMs, now }: { plan: Si
         const pay = other(s.coin);
         // Trader price now (after fee) and once the budget is sold, in tJPY per tUSD.
         const start = Pn === null ? null : sellsJpy ? Pn * (1 - fee) : shape === 'curve' ? Pn / (1 - fee) : Pn * (1 + fee);
-        const end = start === null || move === null ? null : sellsJpy ? start / move : start * move;
         const amount = s.amount ? Number(s.amount) / 1e6 : null;
         // What the provider receives if the whole amount sells, and the fee part of it.
         const flat = amount === null || Pn === null ? null : sellsJpy ? amount / Pn : amount * Pn;
@@ -577,31 +575,8 @@ function Preview({ plan, P, shape, feeBps, depth, expiresAtMs, now }: { plan: Si
                   ? `Traders pay 1 tUSD and get ${num(start)} tJPY from you.`
                   : `Traders pay ${num(start)} tJPY and get 1 tUSD from you.`}
             </p>
-            {shape === 'curve' && start !== null && (
-              <div className="range">
-                <div className="spread small">
-                  <span className="muted">As it sells, your price moves</span>
-                  <span className="faint">tJPY per tUSD</span>
-                </div>
-                <div className={`range-track${end === null ? ' open' : ''}`} aria-hidden="true" />
-                <div className="spread small">
-                  <span>
-                    <b className="num">{num(start)}</b> <span className="faint">now</span>
-                  </span>
-                  <span>
-                    {end === null ? <span className="faint">never fully sells</span> : (
-                      <>
-                        <b className="num">{num(end)}</b> <span className="faint">all sold</span>
-                      </>
-                    )}
-                  </span>
-                </div>
-                <p className="pv-note">
-                  {sellsJpy
-                    ? 'Each fill makes your tJPY a little dearer: traders get fewer tJPY per tUSD.'
-                    : 'Each fill makes your tUSD a little dearer: traders pay more tJPY per tUSD.'}
-                </p>
-              </div>
+            {amount !== null && Pn !== null && (
+              <PriceChart coin={s.coin} amount={amount} mid={Pn} fee={fee} shape={shape} depth={depth} />
             )}
             {amount !== null && (
               <div className="kv pv-total">
