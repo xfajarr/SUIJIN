@@ -132,23 +132,25 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; 
 .seg.full { display: flex; }
 .seg.full button { flex: 1; }
 
-/* ---------- token amount panel ---------- */
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; transition: border-color 0.2s var(--ease), background-color 0.2s var(--ease); }
-.panel:focus-within { border-color: rgba(43, 196, 180, 0.6); background: var(--panel-hover); }
-.panel.invalid { border-color: rgba(255, 122, 107, 0.7); }
+/* ---------- token amount panel: filled for what you give, outlined for what you get ---------- */
+.panel { background: rgba(232, 251, 247, 0.05); border-radius: 18px; padding: 18px 18px 22px; display: flex; flex-direction: column; gap: 16px; box-shadow: inset 0 0 0 1px transparent; transition: box-shadow 0.2s var(--ease), background-color 0.2s var(--ease); }
+.panel.outline { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
+.panel:focus-within { box-shadow: inset 0 0 0 1px rgba(43, 196, 180, 0.55); }
+.panel.invalid { box-shadow: inset 0 0 0 1px rgba(255, 122, 107, 0.7); }
 .panel-top, .panel-bottom { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+.panel-top label { color: var(--ink); font-size: 14px; font-weight: 600; }
 .panel-main { display: flex; align-items: center; gap: 12px; }
-.amount { flex: 1; min-width: 0; font: inherit; font-size: 30px; font-weight: 500; letter-spacing: -0.01em; background: transparent; border: 0; color: var(--ink); padding: 0; font-variant-numeric: tabular-nums; }
+.amount { flex: 1; min-width: 0; font: inherit; font-size: 34px; font-weight: 500; letter-spacing: -0.02em; background: transparent; border: 0; color: var(--ink); padding: 0; font-variant-numeric: tabular-nums; }
 .amount:focus { outline: none; }
 .amount::placeholder { color: var(--faint); }
 .amount[readonly] { cursor: default; }
 .amount { text-overflow: ellipsis; }
-.token { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 5px; border-radius: 999px; background: rgba(232, 251, 247, 0.07); border: 1px solid var(--line); font-weight: 600; white-space: nowrap; }
+.token { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 999px; background: rgba(2, 8, 7, 0.62); border: 0; font-size: 15px; font-weight: 700; white-space: nowrap; }
 .coin { display: inline-grid; place-items: center; border-radius: 50%; font-weight: 700; flex: none; line-height: 1; }
 .coin-tUSD { background: linear-gradient(135deg, #5fe0d2, #0b6f73); color: #02201d; }
 .coin-tJPY { background: linear-gradient(135deg, #ffd27a, #c27a10); color: #2a1700; }
 .token-btn { color: var(--ink); cursor: pointer; transition: background-color 0.18s var(--ease), border-color 0.18s var(--ease); }
-.token-btn:hover { background: rgba(232, 251, 247, 0.13); border-color: var(--line-strong); }
+.token-btn:hover { background: rgba(2, 8, 7, 0.9); }
 .token-btn svg { color: var(--muted); }
 .max { border: 0; background: none; color: var(--accent); font-size: 12px; padding: 0; }
 .max:hover { color: var(--ink); }

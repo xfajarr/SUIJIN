@@ -187,6 +187,8 @@ export function AmountPanel(p: {
   invalid?: boolean;
   footer?: ReactNode;
   autoFocus?: boolean;
+  /** Border instead of fill: the receiving side of a trade. */
+  outline?: boolean;
 }) {
   const id = useId();
   const chip = (
@@ -196,7 +198,7 @@ export function AmountPanel(p: {
     </>
   );
   return (
-    <div className={`panel${p.invalid ? ' invalid' : ''}`}>
+    <div className={`panel${p.outline ? ' outline' : ''}${p.invalid ? ' invalid' : ''}`}>
       <div className="panel-top">
         <label htmlFor={id}>{p.label}</label>
         {p.balance !== undefined && (
@@ -222,7 +224,7 @@ export function AmountPanel(p: {
             inputMode="decimal"
             autoComplete="off"
             spellCheck={false}
-            placeholder="0"
+            placeholder="0.00"
             value={p.value}
             readOnly={!p.onChange}
             tabIndex={p.onChange ? undefined : -1}
