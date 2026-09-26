@@ -2,28 +2,74 @@ import { useCurrentAccount, useCurrentClient, useDAppKit } from '@mysten/dapp-ki
 import type { Transaction } from '@mysten/sui/transactions';
 import {
   DEPLOYMENT,
-  addressBalance,
   allowanceRemaining,
-  coinsOf,
+  normalizeType,
+  sameType,
+  tokensOf,
   freshAllowances,
   freshStrategies,
   listAllowanceCaps,
   listStrategies,
   type AllowanceState,
+  type CoinInfo,
   type CoinKey,
   type Quote,
   type StrategyState,
 } from '@suijin/sdk';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
 // Data layer for every page: server API, chain reads, wallet transactions, toasts.
 
 export const SERVER = (import.meta.env.VITE_SERVER_URL as string | undefined) ?? 'http://localhost:8790';
-export const COINS = coinsOf();
-export const COIN_KEYS: CoinKey[] = ['tUSD', 'tJPY'];
-export const other = (c: CoinKey): CoinKey => (c === 'tUSD' ? 'tJPY' : 'tUSD');
-/** 'tJPY' for a strategy's coin type (the demo only has two coins). */
-export const keyOf = (type: string): CoinKey => (type.toLowerCase().endsWith('::tjpy::tjpy') ? 'tJPY' : 'tUSD');
+
+// ---------- tokens: the SDK registry plus coins this browser added by type ----------
+
+const CUSTOM = 'suijin:tokens';
+const readCustom = (): CoinInfo[] => {
+  try {
+    return JSON.parse(localStorage.getItem(CUSTOM) ?? '[]') as CoinInfo[];
+  } catch {
+    return [];
+  }
+};
+let tokenList: CoinInfo[] = [...tokensOf(), ...readCustom()];
+const tokenSubs = new Set<() => void>();
+
+/** Every token the app can pick. Custom ones are per browser; the chain accepts any coin type. */
+export const tokens = () => tokenList;
+export const useTokens = () =>
+  useSyncExternalStore(
+    (f) => {
+      tokenSubs.add(f);
+      return () => void tokenSubs.delete(f);
+    },
+    tokens,
+    tokens,
+  );
+
+/** Adds a coin found by type (from fetchCoinInfo). A symbol clash keeps both, suffixing the newcomer. */
+export function addToken(info: CoinInfo): CoinInfo {
+  const known = tokenList.find((t) => sameType(t.type, info.type));
+  if (known) return known;
+  const key = tokenList.some((t) => t.key === info.key) ? `${info.key}·${info.type.slice(2, 6)}` : info.key;
+  const added = { ...info, key };
+  tokenList = [...tokenList, added];
+  try {
+    localStorage.setItem(CUSTOM, JSON.stringify(tokenList.filter((t) => !tokensOf().some((b) => b.key === t.key))));
+  } catch {
+    // private mode: the token lasts for this visit only
+  }
+  tokenSubs.forEach((f) => f());
+  return added;
+}
+
+/** Registry entry for a key; an unknown key (a stale link) falls back to 6 decimals. */
+export const coin = (key: CoinKey): CoinInfo =>
+  tokenList.find((t) => t.key === key) ?? { key, type: key, symbol: key, name: key, decimals: 6 };
+/** Key for a coin type, e.g. a strategy's base: the registry symbol, else the type's last segment. */
+export const keyOf = (type: string): CoinKey => tokenList.find((t) => sameType(t.type, type))?.key ?? type.split('::').pop() ?? type;
+/** Any other token than `key`, for a fresh pair: the first listed. */
+export const otherThan = (key: CoinKey): CoinKey => tokenList.find((t) => t.key !== key)?.key ?? key;
 
 const scan = `https://suiscan.xyz/${DEPLOYMENT.network}`;
 export const explorer = {
@@ -136,21 +182,33 @@ export function useDebounced<T>(value: T, ms = 350): T {
 
 // ---------- chain reads ----------
 
-export type Balances = Record<CoinKey, bigint> & { sui: bigint };
+export type Balances = {
+  /** Address balance per token: what allowances can spend. */
+  address: Record<CoinKey, bigint>;
+  /** Still held as Coin objects: spendable after depositToBalance. */
+  coins: Record<CoinKey, bigint>;
+  /** Total SUI, for gas. */
+  gas: bigint;
+};
 
-/** The connected wallet's address balances (what allowances can spend) plus SUI for gas. null = no wallet. */
+/** The connected wallet's balances for every known token, in one call. null = no wallet. */
 export function useBalances(): Poll<Balances | null> {
   const me = useCurrentAccount()?.address;
   const client = useCurrentClient();
+  const list = useTokens();
   return usePoll(async () => {
     if (!me) return null;
-    const [tUSD, tJPY, sui] = await Promise.all([
-      addressBalance(client, me, COINS.tUSD.type),
-      addressBalance(client, me, COINS.tJPY.type),
-      client.getBalance({ owner: me, coinType: '0x2::sui::SUI' }),
-    ]);
-    return { tUSD, tJPY, sui: BigInt(sui.balance.balance) };
-  }, [me, client]);
+    const { balances } = await client.listBalances({ owner: me });
+    const byType = new Map(balances.map((b) => [normalizeType(b.coinType), b]));
+    const out: Balances = { address: {}, coins: {}, gas: 0n };
+    for (const t of list) {
+      const b = byType.get(normalizeType(t.type));
+      out.address[t.key] = BigInt(b?.addressBalance ?? 0);
+      out.coins[t.key] = BigInt(b?.coinBalance ?? 0);
+    }
+    out.gas = BigInt(byType.get(normalizeType('0x2::sui::SUI'))?.balance ?? 0);
+    return out;
+  }, [me, client, list]);
 }
 
 export type Budget = {
@@ -176,11 +234,13 @@ export type Positions = {
 export function usePositions(): Poll<Positions | null> {
   const me = useCurrentAccount()?.address;
   const client = useCurrentClient();
+  const list = useTokens();
   return usePoll(
     async () => {
       if (!me) return null;
+      // ponytail: one AllowanceCap query per known token; one typed query if the list grows large
       const [caps, listed] = await Promise.all([
-        Promise.all(COIN_KEYS.map(async (coin) => (await listAllowanceCaps(me, COINS[coin].type)).map((c) => ({ ...c, coin })))).then((x) => x.flat()),
+        Promise.all(list.map(async (t) => (await listAllowanceCaps(me, t.type)).map((c) => ({ ...c, coin: t.key })))).then((x) => x.flat()),
         listStrategies(),
       ]);
       const mine = listed.filter((s) => s.maker.toLowerCase() === me.toLowerCase());
@@ -204,7 +264,7 @@ export function usePositions(): Poll<Positions | null> {
         strategies,
       };
     },
-    [me, client],
+    [me, client, list],
     8000,
   );
 }
