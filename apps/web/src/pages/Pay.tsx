@@ -4,7 +4,7 @@ import type { CoinKey } from '@suijin/sdk';
 import { useState } from 'react';
 import { COIN_KEYS, openConnect, other, toast, useBalances, useQuotes } from '../chain';
 import { AmountPanel, CoinIcon, Segmented, cleanAmount, fmt, fmtCoin, parseAmount, short, toInput } from '../ui';
-import { FlowProgress, Gear, QuoteDetails, Receipt, RefreshRing, SlippageSettings, settledLine, useOrderFlow } from './trade';
+import { FlowProgress, QuoteDetails, Receipt, RefreshRing, SlippageSettings, Sliders, settledLine, useOrderFlow } from './trade';
 
 const REFRESH_MS = 15_000;
 
@@ -82,7 +82,7 @@ export function Pay() {
           <div className="inline">
             {quote && idle && <RefreshRing updatedAt={live.updatedAt} ms={REFRESH_MS} onClick={live.refresh} />}
             <button type="button" className="icon-btn" aria-expanded={settings} aria-label="Payment settings" onClick={() => setSettings((v) => !v)}>
-              <Gear />
+              <Sliders />
             </button>
           </div>
         </div>

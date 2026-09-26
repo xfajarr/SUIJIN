@@ -160,14 +160,11 @@ export function SlippageSettings({ value, onChange, note }: { value: number; onC
   );
 }
 
-export const Gear = () => (
+export const Sliders = () => (
   <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-    <path
-      d="M10 12.6a2.6 2.6 0 100-5.2 2.6 2.6 0 000 5.2zm6.4-1.6l1.3 1-1.5 2.6-1.6-.5a6 6 0 01-1.6.9L12.6 17H9.4l-.4-1.9a6 6 0 01-1.6-.9l-1.6.5-1.5-2.6 1.3-1a6 6 0 010-1.9l-1.3-1 1.5-2.6 1.6.5a6 6 0 011.6-.9L9.4 3h3.2l.4 1.6a6 6 0 011.6.9l1.6-.5 1.5 2.6-1.3 1a6 6 0 010 1.9z"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinejoin="round"
-    />
+    <path d="M3 6.5h8.5M15.5 6.5H17M3 13.5h1.5M8.5 13.5H17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    <circle cx="13.5" cy="6.5" r="2" stroke="currentColor" strokeWidth="1.6" />
+    <circle cx="6.5" cy="13.5" r="2" stroke="currentColor" strokeWidth="1.6" />
   </svg>
 );
 

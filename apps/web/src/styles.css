@@ -256,7 +256,7 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; 
 .card-title { margin: 0; font-size: 18px; font-weight: 600; }
 .icon-btn { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; border: 0; background: transparent; color: var(--muted); transition: background-color 0.18s var(--ease), color 0.18s var(--ease), transform 0.35s var(--ease); }
 .icon-btn:hover { color: var(--ink); background: rgba(232, 251, 247, 0.08); }
-.icon-btn[aria-expanded='true'] { color: var(--accent); transform: rotate(60deg); }
+.icon-btn[aria-expanded='true'] { color: var(--accent); background: var(--accent-soft); }
 .settings { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); animation: rise 0.25s var(--ease) both; }
 .settings .hint { margin: 0; }
 .pair { display: flex; flex-direction: column; gap: 6px; transition: opacity 0.3s var(--ease); }

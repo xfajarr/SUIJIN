@@ -3,7 +3,7 @@ import { mintTestCoins, type CoinKey } from '@suijin/sdk';
 import { useState } from 'react';
 import { openConnect, other, useAction, useBalances, useQuotes } from '../chain';
 import { AmountPanel, FlipArrows, fmt, parseAmount, toInput } from '../ui';
-import { FlowProgress, Gear, QuoteDetails, RateLine, Receipt, RefreshRing, SlippageSettings, settledLine, useOrderFlow } from './trade';
+import { FlowProgress, QuoteDetails, RateLine, Receipt, RefreshRing, SlippageSettings, Sliders, settledLine, useOrderFlow } from './trade';
 
 const REFRESH_MS = 15_000;
 
@@ -85,7 +85,7 @@ export function Swap() {
               aria-label="Swap settings"
               onClick={() => setSettings((v) => !v)}
             >
-              <Gear />
+              <Sliders />
             </button>
           </div>
         </div>
