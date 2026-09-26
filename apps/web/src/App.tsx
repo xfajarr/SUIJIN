@@ -10,12 +10,19 @@ import { Portfolio } from './pages/Portfolio';
 import { Swap } from './pages/Swap';
 import { Toasts, short } from './ui';
 
-const PAGES: { path: string; label: string; Page: ComponentType }[] = [
-  { path: 'swap', label: 'Swap', Page: Swap },
-  { path: 'pay', label: 'Pay', Page: Pay },
-  { path: 'earn', label: 'Earn', Page: Earn },
-  { path: 'limit', label: 'Limit', Page: Limit },
-  { path: 'portfolio', label: 'Portfolio', Page: Portfolio },
+const PAGES: { path: string; Page: ComponentType }[] = [
+  { path: 'swap', Page: Swap },
+  { path: 'pay', Page: Pay },
+  { path: 'earn', Page: Earn },
+  { path: 'limit', Page: Limit },
+  { path: 'portfolio', Page: Portfolio },
+];
+
+/** Navbar: Swap, Pay and Limit live under one Trade card with its own tabs. */
+const NAV = [
+  { href: '#/swap', label: 'Trade', paths: ['swap', 'pay', 'limit'] },
+  { href: '#/earn', label: 'Earn', paths: ['earn'] },
+  { href: '#/portfolio', label: 'Portfolio', paths: ['portfolio'] },
 ];
 
 /** '#/pay?to=…' -> 'pay'. Pages read their own query params. */
@@ -83,7 +90,7 @@ function Nav({ current }: { current: string }) {
     const a = place(mounted.current);
     if (mounted.current) a?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); // phones: keep the tab in view
     mounted.current = true;
-  }, [current]);
+  }, [NAV.find((n) => n.paths.includes(current))?.label]);
   useEffect(() => {
     // Web fonts and resizes change tab widths: re-measure without animating.
     const settle = () => place(false);
@@ -94,9 +101,9 @@ function Nav({ current }: { current: string }) {
   return (
     <nav className="nav" aria-label="Main" ref={ref}>
       <span className={`nav-pill${pill.animate ? ' animate' : ''}`} style={{ width: pill.w, transform: `translateX(${pill.x}px)` }} aria-hidden="true" />
-      {PAGES.map((p) => (
-        <a key={p.path} href={`#/${p.path}`} aria-current={p.path === current ? 'page' : undefined}>
-          {p.label}
+      {NAV.map((n) => (
+        <a key={n.label} href={n.href} aria-current={n.paths.includes(current) ? 'page' : undefined}>
+          {n.label}
         </a>
       ))}
     </nav>
