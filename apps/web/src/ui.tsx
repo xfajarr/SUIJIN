@@ -1,10 +1,19 @@
-import type { CoinKey } from '@suijin/sdk';
-import { useId, useSyncExternalStore, type ReactNode } from 'react';
-import { explorer, toast } from './chain';
-import { cleanAmount, fmt, short } from './format';
+import { fetchCoinInfo, type CoinKey } from '@suijin/sdk';
+import { useId, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { addToken, coin, explorer, friendlyError, toast, useTokens } from './chain';
+import { amt, cleanAmount, rate, short } from './format';
 
 // Shared UI primitives. Formatting lives in format.ts (re-exported); page-specific pieces live with their page.
 export * from './format';
+
+// ---------- token amounts: decimals come from the registry ----------
+
+/** Raw amount of token `key` for display. */
+export const fmtAmt = (v: bigint, key: CoinKey, maxFraction?: number) => amt(v, coin(key).decimals, maxFraction);
+/** "1,500 tJPY". */
+export const fmtCoin = (v: bigint, key: CoinKey) => `${fmtAmt(v, key)} ${key}`;
+/** Whole `out` per whole `inp`, from raw amounts of two tokens. */
+export const rateOf = (out: bigint, outKey: CoinKey, inp: bigint, inKey: CoinKey) => rate(out, coin(outKey).decimals, inp, coin(inKey).decimals);
 
 // ---------- primitives ----------
 
@@ -12,11 +21,94 @@ export function Skeleton({ w = '100%', h = 16, r }: { w?: number | string; h?: n
   return <span className="skel" style={{ width: w, height: h, borderRadius: r }} aria-hidden="true" />;
 }
 
-export function CoinIcon({ coin, size = 28 }: { coin: CoinKey; size?: number }) {
+const GLYPH: Record<string, string> = { tUSD: '$', tJPY: '¥' };
+
+/** Token logo: its icon URL, a glyph for the demo coins, else its first letter. */
+export function CoinIcon({ coin: key, size = 28 }: { coin: CoinKey; size?: number }) {
+  const info = coin(key);
+  const [broken, setBroken] = useState(false);
+  if (info.iconUrl && !broken)
+    return <img className="coin coin-img" src={info.iconUrl} alt="" width={size} height={size} onError={() => setBroken(true)} aria-hidden="true" />;
   return (
-    <span className={`coin coin-${coin}`} style={{ width: size, height: size, fontSize: Math.round(size * 0.5) }} aria-hidden="true">
-      {coin === 'tUSD' ? '$' : '¥'}
+    <span className={`coin coin-${key.replace(/[^\w]/g, '')}`} style={{ width: size, height: size, fontSize: Math.round(size * 0.5) }} aria-hidden="true">
+      {GLYPH[key] ?? info.symbol.slice(0, 1).toUpperCase()}
     </span>
+  );
+}
+
+const COIN_TYPE = /^0x[0-9a-fA-F]{1,64}::\w+::\w+$/;
+
+/**
+ * Token list in a modal: search by symbol or name, or paste any coin type to add it from its
+ * on-chain metadata. `exclude` is the other side of the pair.
+ */
+export function TokenPicker(p: { value: CoinKey; exclude?: CoinKey; onPick: (key: CoinKey) => void; balances?: Record<CoinKey, bigint> | null; label: string }) {
+  const list = useTokens();
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [q, setQ] = useState('');
+  const [adding, setAdding] = useState(false);
+  const query = q.trim();
+  const isType = COIN_TYPE.test(query);
+  const shown = list.filter((t) => t.key !== p.exclude && (isType ? t.type.toLowerCase() === query.toLowerCase() : `${t.symbol} ${t.name}`.toLowerCase().includes(query.toLowerCase())));
+  const pick = (key: CoinKey) => {
+    p.onPick(key);
+    dialog.current?.close();
+  };
+  const add = async () => {
+    setAdding(true);
+    try {
+      const info = await fetchCoinInfo(query);
+      if (!info) toast.push({ kind: 'error', title: 'Not a coin', body: 'No coin metadata for that type on this network.' });
+      else pick(addToken(info).key);
+    } catch (e) {
+      toast.push({ kind: 'error', title: 'Could not add token', body: friendlyError(e) });
+    } finally {
+      setAdding(false);
+    }
+  };
+  return (
+    <>
+      <button type="button" className="token token-btn" onClick={() => (setQ(''), dialog.current?.showModal())} aria-label={`${p.value}, ${p.label}`}>
+        <CoinIcon coin={p.value} size={26} />
+        {p.value}
+        <Chevron />
+      </button>
+      <dialog ref={dialog} className="picker" aria-label={p.label} onClick={(e) => e.target === dialog.current && dialog.current?.close()}>
+        <div className="picker-head">
+          <strong>{p.label}</strong>
+          <button type="button" className="t-close" aria-label="Close" onClick={() => dialog.current?.close()}>
+            ×
+          </button>
+        </div>
+        <input className="picker-search" placeholder="Search, or paste a coin type 0x…::coin::COIN" value={q} onChange={(e) => setQ(e.target.value)} autoFocus spellCheck={false} />
+        <ul className="picker-list">
+          {shown.map((t) => (
+            <li key={t.key}>
+              <button type="button" aria-current={t.key === p.value || undefined} onClick={() => pick(t.key)}>
+                <CoinIcon coin={t.key} size={32} />
+                <span>
+                  <b>{t.symbol}</b>
+                  <small>{t.name}</small>
+                </span>
+                {p.balances?.[t.key] !== undefined && p.balances[t.key]! > 0n && <span className="num small">{amt(p.balances[t.key]!, t.decimals)}</span>}
+              </button>
+            </li>
+          ))}
+          {isType && shown.length === 0 && (
+            <li>
+              <button type="button" onClick={add} disabled={adding}>
+                <span className="coin" style={{ width: 32, height: 32 }}>+</span>
+                <span>
+                  <b>{adding ? 'Looking up…' : 'Add this token'}</b>
+                  <small className="mono">{short(query)}</small>
+                </span>
+              </button>
+            </li>
+          )}
+          {!isType && shown.length === 0 && <li className="picker-empty small">No match. Paste the full coin type to add any token.</li>}
+        </ul>
+      </dialog>
+    </>
   );
 }
 
@@ -178,8 +270,11 @@ export function AmountPanel(p: {
   value: string;
   /** Omit for a read-only (quoted) amount. */
   onChange?: (v: string) => void;
-  /** Swap the coin (the demo has two): shows the chip as a button. */
-  onCoin?: () => void;
+  /** Pick another token: shows the chip as a picker. `exclude` is the other side of the pair. */
+  onPick?: (key: CoinKey) => void;
+  exclude?: CoinKey;
+  /** Balances shown next to each token in the picker. */
+  balances?: Record<CoinKey, bigint> | null;
   /** undefined = hide, null = loading. */
   balance?: bigint | null;
   onMax?: () => void;
@@ -191,19 +286,14 @@ export function AmountPanel(p: {
   outline?: boolean;
 }) {
   const id = useId();
-  const chip = (
-    <>
-      <CoinIcon coin={p.coin} size={26} />
-      {p.coin}
-    </>
-  );
+  const { decimals } = coin(p.coin);
   return (
     <div className={`panel${p.outline ? ' outline' : ''}${p.invalid ? ' invalid' : ''}`}>
       <div className="panel-top">
         <label htmlFor={id}>{p.label}</label>
         {p.balance !== undefined && (
           <span className="inline">
-            Balance {p.balance === null ? <Skeleton w={52} h={12} /> : <span className="num">{fmt(p.balance)}</span>}
+            Balance {p.balance === null ? <Skeleton w={52} h={12} /> : <span className="num">{amt(p.balance, decimals)}</span>}
             {p.onMax && p.balance !== null && (
               <button type="button" className="max" onClick={p.onMax}>
                 MAX
@@ -230,16 +320,16 @@ export function AmountPanel(p: {
             tabIndex={p.onChange ? undefined : -1}
             autoFocus={p.autoFocus}
             aria-invalid={p.invalid || undefined}
-            onChange={(e) => p.onChange?.(cleanAmount(e.target.value))}
+            onChange={(e) => p.onChange?.(cleanAmount(e.target.value, decimals))}
           />
         )}
-        {p.onCoin ? (
-          <button type="button" className="token token-btn" onClick={p.onCoin} aria-label={`${p.coin}, switch coin`}>
-            {chip}
-            <Chevron />
-          </button>
+        {p.onPick ? (
+          <TokenPicker value={p.coin} exclude={p.exclude} onPick={p.onPick} balances={p.balances} label={`Select token: ${p.label}`} />
         ) : (
-          <span className="token">{chip}</span>
+          <span className="token">
+            <CoinIcon coin={p.coin} size={26} />
+            {p.coin}
+          </span>
         )}
       </div>
       {p.footer && <div className="panel-bottom">{p.footer}</div>}
