@@ -237,37 +237,20 @@ export function PriceField(p: { label: string; value: string | null; onChange: (
 // ---------- page ----------
 
 type Sides = 'both' | CoinKey;
-const SIDES: { value: Sides; label: ReactNode }[] = [
+const SIDE_CARDS: { value: Sides; title: string; caption: string; icon: ReactNode }[] = [
   {
     value: 'both',
-    label: (
-      <span className="side-label">
-        <span className="coin-pair">
-          <CoinIcon coin="tJPY" size={16} />
-          <CoinIcon coin="tUSD" size={16} />
-        </span>
-        Both sides
+    title: 'Both sides',
+    caption: 'Earn from both directions',
+    icon: (
+      <span className="coin-pair">
+        <CoinIcon coin="tJPY" size={20} />
+        <CoinIcon coin="tUSD" size={20} />
       </span>
     ),
   },
-  {
-    value: 'tJPY',
-    label: (
-      <span className="side-label">
-        <CoinIcon coin="tJPY" size={16} />
-        Sell tJPY
-      </span>
-    ),
-  },
-  {
-    value: 'tUSD',
-    label: (
-      <span className="side-label">
-        <CoinIcon coin="tUSD" size={16} />
-        Sell tUSD
-      </span>
-    ),
-  },
+  { value: 'tJPY', title: 'Sell tJPY', caption: 'Receive tUSD', icon: <CoinIcon coin="tJPY" size={20} /> },
+  { value: 'tUSD', title: 'Sell tUSD', caption: 'Receive tJPY', icon: <CoinIcon coin="tUSD" size={20} /> },
 ];
 const CurveIcon = () => (
   <svg width="46" height="22" viewBox="0 0 46 22" fill="none" aria-hidden="true">
@@ -400,7 +383,7 @@ export function Earn() {
           ) : (
             <>
               <Step n={1} title="What you offer">
-                <Segmented label="Sides" full value={sides} options={SIDES} onChange={setSides} />
+                <Options label="What you offer" value={sides} options={SIDE_CARDS} onChange={setSides} />
               </Step>
 
               <Step n={2} title="Price">
