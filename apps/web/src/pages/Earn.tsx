@@ -286,9 +286,11 @@ const FEES = [
   { value: 100, title: '1.00%', caption: 'Volatile pairs' },
 ];
 const DEPTHS = [
+  // Virtual pool = budget × depth; the budget still caps what can sell. Deeper = flatter price.
   { value: 1, title: 'Full range', caption: 'Never sells out' },
-  { value: 2, title: 'Wide', caption: '2× depth' },
-  { value: 5, title: 'Concentrated', caption: '5× depth' },
+  { value: 5, title: 'Wide', caption: 'Moves up to 56%' },
+  { value: 20, title: 'Tight', caption: 'Moves up to 11%' },
+  { value: 100, title: 'Pegged', caption: 'Moves up to 2%' },
 ];
 const DURATIONS = [
   { value: 1, label: '1 h' },
@@ -319,7 +321,7 @@ export function Earn() {
   const [shape, setShape] = useState<Shape>('curve');
   const [price, setPrice] = useState<string | null>(null);
   const [feeBps, setFeeBps] = useState(30);
-  const [depth, setDepth] = useState(2);
+  const [depth, setDepth] = useState(20);
   const [hours, setHours] = useState(24);
   const [amounts, setAmounts] = useState<Record<CoinKey, string>>({ tJPY: '', tUSD: '' });
   const [reuse, setReuse] = useState<Record<CoinKey, boolean>>({ tJPY: false, tUSD: false });
