@@ -2,7 +2,7 @@
   "name": "@suijin/web",
   "private": true,
   "type": "module",
-  "scripts": { "dev": "vite", "build": "tsc -p tsconfig.json && vite build" },
+  "scripts": { "dev": "vite", "build": "tsc -p tsconfig.json && vite build", "deploy": "bun run build && bunx wrangler@4 deploy" },
   "dependencies": {
     "@mysten/dapp-kit-react": "2.1.35",
     "@mysten/sui": "2.33.1",
