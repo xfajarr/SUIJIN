@@ -277,8 +277,8 @@ const FlatIcon = () => (
   </svg>
 );
 const SHAPES: { value: Shape; title: string; caption: string; icon: ReactNode }[] = [
-  { value: 'curve', title: 'Curve', caption: 'Price moves with each fill', icon: <CurveIcon /> },
   { value: 'fixed', title: 'Fixed price', caption: 'One price for every fill', icon: <FlatIcon /> },
+  { value: 'curve', title: 'Curve', caption: 'Price moves with each fill', icon: <CurveIcon /> },
 ];
 const FEES = [
   { value: 5, title: '0.05%', caption: 'Stable pairs' },
@@ -318,7 +318,7 @@ export function Earn() {
   const now = useNow(30_000);
   const flow = useProvideFlow();
   const [sides, setSides] = useState<Sides>('both');
-  const [shape, setShape] = useState<Shape>('curve');
+  const [shape, setShape] = useState<Shape>('fixed'); // tUSD/tJPY is a steady FX pair: one price fits best
   const [price, setPrice] = useState<string | null>(null);
   const [feeBps, setFeeBps] = useState(30);
   const [depth, setDepth] = useState(20);
