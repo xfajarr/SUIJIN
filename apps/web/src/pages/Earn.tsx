@@ -20,7 +20,9 @@ export const pairFor = (coin: CoinKey) =>
 /** A price for an editable field: "149.55". */
 export const priceText = (p: bigint) => fmt(p, 2).replace(/,/g, '');
 
-const num = (x: number) => x.toLocaleString('en-US', { maximumFractionDigits: 2 });
+// Small amounts keep 4 significant digits (0.006646), so a tiny budget never reads as 0.
+const num = (x: number) =>
+  Math.abs(x) >= 1 || x === 0 ? x.toLocaleString('en-US', { maximumFractionDigits: 2 }) : x.toLocaleString('en-US', { maximumSignificantDigits: 4 });
 const compact = (v: bigint) => new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(v) / 1e6);
 const when = (ms: number) => new Date(ms).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
