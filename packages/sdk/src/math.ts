@@ -55,3 +55,61 @@ export function parseUnits(text: string, decimals = 6): bigint {
   }
   return BigInt(whole) * 10n ** BigInt(decimals) + BigInt(frac.padEnd(decimals, '0'));
 }
+
+// ---------- prices across decimals ----------
+// Prices are human rates, "1 unit = P priced", held as integers with PRICE_SCALE fraction digits
+// (150.41 -> 150_410_000n). Tokens differ in decimals (SUI 9, USDC 6), so every conversion to
+// on-chain raw units goes through these helpers.
+
+export const PRICE_SCALE = 1_000_000n;
+const pow10 = (n: number) => 10n ** BigInt(n);
+const gcd = (a: bigint, b: bigint): bigint => (b === 0n ? a : gcd(b, a % b));
+/** Smallest integers with the same ratio, so prices stay far from u64 max. */
+const reduce = (num: bigint, den: bigint) => {
+  const g = gcd(num, den);
+  return { priceNum: num / g, priceDen: den / g };
+};
+
+export type PairDecimals = { unitDecimals: number; pricedDecimals: number };
+/** Which coin the strategy sells: the priced coin (base = priced) or the unit coin (base = unit). */
+export type SellSide = 'priced' | 'unit';
+
+/**
+ * Fixed-price strategy terms with the fee as a spread in the provider's favour:
+ * selling priced, 1 unit buys P·(1 − fee) priced; selling unit, P·(1 + fee) priced buys 1 unit.
+ */
+export function fixedPriceFor(p: PairDecimals & { sell: SellSide; price: bigint; feeBps: bigint }) {
+  if (p.price <= 0n) throw new Error('price must be positive');
+  const unitRaw = pow10(p.unitDecimals);
+  const pricedRaw = pow10(p.pricedDecimals);
+  return p.sell === 'priced'
+    ? reduce(unitRaw * PRICE_SCALE * BPS, p.price * pricedRaw * (BPS - p.feeBps)) // quote = unit, base = priced
+    : reduce(p.price * pricedRaw * (BPS + p.feeBps), PRICE_SCALE * unitRaw * BPS); // quote = priced, base = unit
+}
+
+/** Curve reserves that start at price P: virtual base = budget × depth, virtual quote at P. */
+export function curveReservesFor(p: PairDecimals & { sell: SellSide; price: bigint; amount: bigint; depth: bigint }) {
+  if (p.price <= 0n) throw new Error('price must be positive');
+  const virtualBase = p.amount * p.depth;
+  const unitRaw = pow10(p.unitDecimals);
+  const pricedRaw = pow10(p.pricedDecimals);
+  const virtualQuote =
+    p.sell === 'priced'
+      ? (virtualBase * unitRaw * PRICE_SCALE) / (p.price * pricedRaw) // base priced, quote unit
+      : (virtualBase * p.price * pricedRaw) / (PRICE_SCALE * unitRaw); // base unit, quote priced
+  return { virtualBase, virtualQuote };
+}
+
+/** Human price (PRICE_SCALE) from a trade: `unitAmount` of unit against `pricedAmount` of priced, both raw. */
+export function priceOf(p: PairDecimals & { unitAmount: bigint; pricedAmount: bigint }): bigint | null {
+  if (p.unitAmount <= 0n) return null;
+  return (p.pricedAmount * pow10(p.unitDecimals) * PRICE_SCALE) / (p.unitAmount * pow10(p.pricedDecimals));
+}
+
+/** Raw amount of the other side at price P: unit -> priced or priced -> unit. Rounds down. */
+export function convertAt(p: PairDecimals & { price: bigint; amount: bigint; from: SellSide }): bigint {
+  if (p.price <= 0n) return 0n;
+  const unitRaw = pow10(p.unitDecimals);
+  const pricedRaw = pow10(p.pricedDecimals);
+  return p.from === 'unit' ? (p.amount * p.price * pricedRaw) / (PRICE_SCALE * unitRaw) : (p.amount * PRICE_SCALE * unitRaw) / (p.price * pricedRaw);
+}
