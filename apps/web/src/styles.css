@@ -341,3 +341,4 @@ mysten-dapp-kit-connect-button, mysten-dapp-kit-connect-modal {
 .picker-list button > span:nth-child(2) { display: grid; flex: 1; min-width: 0; }
 .picker-list small { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .picker-empty { padding: 14px 10px; color: var(--muted); }
+.pair-pick { display: inline-flex; align-items: center; gap: 6px; }
