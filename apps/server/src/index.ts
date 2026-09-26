@@ -34,7 +34,7 @@ const json = (body: unknown, status = 200) =>
   });
 const preflight = () => new Response(null, { headers: cors });
 
-type QuoteRequest = { buy: string; sell: string } & ({ quoteIn: bigint } | { baseOut: bigint });
+type QuoteRequest = { buy: string; sell: string; slippageBps?: bigint } & ({ quoteIn: bigint } | { baseOut: bigint });
 
 /** Quotes for a trader who pays `sell` and receives `buy`, exact input or exact output. */
 async function quotes(req: QuoteRequest) {
@@ -47,12 +47,12 @@ async function quotes(req: QuoteRequest) {
     Promise.all(holders.map(async (s) => [balanceKey(s.maker, s.baseType), await addressBalance(client, s.maker, s.baseType)] as const)),
     freshAllowances(client, [...new Set(strategies.map((s) => s.makerAllowanceId))]),
   ]);
-  const common = { strategies, makerBalances: new Map(balances), allowances, base: req.buy, quote: req.sell, nowMs: Date.now() };
+  const common = { strategies, makerBalances: new Map(balances), allowances, base: req.buy, quote: req.sell, nowMs: Date.now(), slippageBps: req.slippageBps };
   return 'quoteIn' in req ? buildQuotes({ ...common, quoteIn: req.quoteIn }) : buildQuotes({ ...common, baseOut: req.baseOut });
 }
 
 /**
- * Body: { sell: 'tUSD' | coin type, buy: 'tJPY' | coin type, amountIn | amountOut: integer string }.
+ * Body: { sell: 'tUSD' | coin type, buy: 'tJPY' | coin type, amountIn | amountOut: integer string, slippageBps?: 0..1000 }.
  * The original { quoteIn } body still means "pay tUSD, receive tJPY".
  */
 function parseQuoteRequest(body: Record<string, unknown>): QuoteRequest | string {
@@ -62,8 +62,11 @@ function parseQuoteRequest(body: Record<string, unknown>): QuoteRequest | string
   const amountIn = body.amountIn ?? body.quoteIn;
   const amountOut = body.amountOut;
   const isInt = (v: unknown) => typeof v === 'string' && /^[1-9]\d*$/.test(v);
-  if (isInt(amountIn) && amountOut === undefined) return { sell: sell.type, buy: buy.type, quoteIn: BigInt(amountIn as string) };
-  if (isInt(amountOut) && amountIn === undefined) return { sell: sell.type, buy: buy.type, baseOut: BigInt(amountOut as string) };
+  const bps = Number(body.slippageBps ?? 100);
+  if (!Number.isInteger(bps) || bps < 0 || bps > 1000) return 'slippageBps must be an integer from 0 to 1000';
+  const slippageBps = BigInt(bps);
+  if (isInt(amountIn) && amountOut === undefined) return { sell: sell.type, buy: buy.type, slippageBps, quoteIn: BigInt(amountIn as string) };
+  if (isInt(amountOut) && amountIn === undefined) return { sell: sell.type, buy: buy.type, slippageBps, baseOut: BigInt(amountOut as string) };
   return 'send exactly one of amountIn or amountOut as a positive integer string';
 }
 
