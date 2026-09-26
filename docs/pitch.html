@@ -172,6 +172,75 @@ h2 { font-size: 56px; max-width: 1100px; }
 .link { display: flex; justify-content: space-between; gap: 20px; padding: 14px 20px; border: 1px solid var(--line); border-radius: 14px; background: rgba(6, 26, 24, 0.75); font-size: 17px; color: var(--mute); }
 .link code { font: 500 16px var(--mono); color: var(--teal-2); }
 
+
+/* ---------- diagrams: a fixed 1344px-wide canvas, boxes placed on it, wires drawn in SVG ---------- */
+.dia { position: relative; width: 1344px; flex: none; }
+.wires { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.wire { fill: none; stroke-width: 2.5; }
+.wire.gold { stroke: var(--gold); }
+.wire.teal { stroke: var(--teal); }
+.wire.dash { stroke-dasharray: 7 7; animation: flow 1.2s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -14; } }
+.wire-label { font: 500 15px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; }
+.wire-label.gold { fill: var(--gold); }
+.node { position: absolute; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 18px 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
+.node small { font: 500 12px var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+.wallet-node { border-color: rgba(43, 196, 180, 0.5); background: linear-gradient(180deg, rgba(43, 196, 180, 0.12), var(--panel)); }
+.wallet-node small { color: var(--teal-2); }
+.wallet-node strong { font: 400 34px var(--display); }
+.wallet-node span { font-size: 16px; color: var(--mute); }
+.vault-row, .mkt-row { position: absolute; left: 740px; width: 604px; height: 88px; display: grid; grid-template-columns: 34px 150px 170px 1fr 60px; align-items: center; gap: 14px; padding: 0 20px; border: 1px dashed rgba(244, 182, 60, 0.45); border-radius: 14px; background: rgba(244, 182, 60, 0.05); }
+.vault-row b, .mkt-row b { font-size: 17px; }
+.vault-row em, .mkt-row em { font: 500 14px var(--mono); font-style: normal; color: var(--gold); }
+.mkt-row { left: 780px; width: 564px; height: 96px; grid-template-columns: 140px 170px 1fr 64px; border: 1px solid var(--line); background: var(--panel); }
+.mkt-row em { color: var(--mute); }
+.lock { width: 26px; height: 22px; margin-top: 8px; border-radius: 5px; background: var(--gold); position: relative; }
+.lock::before { content: ''; position: absolute; left: 5px; top: -12px; width: 12px; height: 14px; border: 3px solid var(--gold); border-bottom: 0; border-radius: 10px 10px 0 0; }
+.share { height: 8px; border-radius: 99px; background: rgba(232, 251, 247, 0.08); overflow: hidden; }
+.share i { display: block; height: 100%; border-radius: inherit; background: var(--gold); }
+.share.full i { width: 100%; background: linear-gradient(90deg, var(--teal), var(--teal-2)); }
+.pct { font: 600 20px var(--mono); color: var(--gold); text-align: right; }
+.pct.teal { color: var(--teal); }
+.dia-note { position: absolute; font: 500 12px var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+.legend { position: absolute; display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--mute); }
+.dash-key { width: 40px; height: 0; border-top: 2.5px dashed var(--teal); }
+.allow-node { border-color: rgba(77, 162, 255, 0.55); background: linear-gradient(180deg, rgba(77, 162, 255, 0.12), var(--panel)); }
+.allow-node small { color: var(--sui); }
+.allow-node ul { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; font-size: 16px; color: var(--mute); }
+.allow-node li b { display: inline-block; width: 74px; color: var(--ink); font-weight: 600; }
+.lane { position: absolute; left: 0; font: 500 13px var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--teal-2); writing-mode: vertical-rl; transform: rotate(180deg); height: 110px; text-align: center; }
+.step-node { width: 208px; height: 110px; }
+.step-node b { font-size: 19px; }
+.step-node span:last-child { font-size: 14px; color: var(--mute); }
+.dot { position: absolute; top: -13px; left: 18px; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--teal); color: #02201d; font: 600 14px var(--body); }
+.dot.gold { background: var(--gold); color: #1d1202; }
+.ptb-node { justify-content: flex-start; gap: 12px; padding: 30px 26px 24px; border: 1.5px solid rgba(244, 182, 60, 0.6); background: linear-gradient(180deg, rgba(244, 182, 60, 0.1), var(--panel) 60%); }
+.ptb-node small { color: var(--gold); }
+.checks { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.checks li { display: flex; align-items: center; gap: 10px; font-size: 16px; }
+.checks li::before { content: ''; flex: none; width: 18px; height: 18px; border-radius: 50%; background: rgba(43, 196, 180, 0.18) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='%232bc4b4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/14px no-repeat; }
+.pay { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: rgba(2, 8, 7, 0.6); font: 500 15px var(--mono); }
+.pay span:first-child { color: var(--gold); }
+.pay span:last-child { color: var(--mute); font-family: var(--body); }
+.pay i { height: 2px; background: linear-gradient(90deg, var(--gold), transparent); position: relative; }
+.pay i::after { content: ''; position: absolute; right: 0; top: -4px; border: 5px solid transparent; border-left: 7px solid var(--gold); }
+.only { margin-top: auto; align-self: flex-start; padding: 6px 12px; border-radius: 999px; background: var(--gold); color: #1d1202; font: 600 13px var(--body); font-style: normal; }
+
+.gate { display: grid; grid-template-columns: 300px 60px 480px 60px 1fr; align-items: center; }
+.gate .node { position: relative; }
+.gate-who b { font-size: 21px; }
+.gate-who span { font-size: 15px; line-height: 1.45; color: var(--mute); }
+.gate-checks { border-color: rgba(43, 196, 180, 0.5); padding: 24px 26px; gap: 14px; }
+.gate-checks small { color: var(--teal-2); }
+.gate-arrow { height: 2.5px; margin: 0 8px; background: var(--teal); position: relative; }
+.gate-arrow::after { content: ''; position: absolute; right: -2px; top: -6px; border: 7px solid transparent; border-left: 10px solid var(--teal); }
+.gate-out { display: grid; gap: 16px; }
+.out b { font-size: 19px; }
+.out.ok { border-color: rgba(43, 196, 180, 0.55); } .out.ok small { color: var(--teal); }
+.out.bad { border-color: rgba(244, 182, 60, 0.5); } .out.bad small { color: var(--gold); }
+@media (prefers-reduced-motion: reduce) { .wire.dash { animation: none; } }
+@media (max-width: 760px) { .dia { width: 100%; overflow-x: auto; } .gate { grid-template-columns: 1fr; gap: 12px; } .gate-arrow { display: none; } }
+
 /* ---------- controls + speaker notes ---------- */
 .bar { position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; align-items: center; gap: 6px; padding: 6px; border: 1px solid var(--line); border-radius: 999px; background: rgba(6, 26, 24, 0.85); backdrop-filter: blur(10px); opacity: 0.25; transition: opacity 0.2s; z-index: 5; }
 .bar:hover, .bar:focus-within { opacity: 1; }
@@ -237,18 +306,31 @@ template { display: none; }
   <section class="slide" data-time="0:15–0:40">
     <span class="kicker"><i></i>The problem</span>
     <h2>Every market wants its own deposit</h2>
-    <p class="lede">A market maker who wants to quote on an AMM, a limit book, an RFQ desk and a payment rail has to split capital four ways and lock each part in someone else's vault.</p>
-    <div class="silos">
-      <div class="silo"><small>AMM pool</small><b>Deposit into the pool</b><div class="vault">250,000 tJPY</div></div>
-      <div class="silo"><small>Limit orders</small><b>Escrowed per order</b><div class="vault">250,000 tJPY</div></div>
-      <div class="silo"><small>RFQ desk</small><b>Pre-funded inventory</b><div class="vault">250,000 tJPY</div></div>
-      <div class="silo"><small>Payments</small><b>Settlement float</b><div class="vault">250,000 tJPY</div></div>
+    <p class="lede">LPs, traders with limit orders, apps that settle payments: each venue asks you to send it coins first, so one balance gets split before any of it is used.</p>
+    <div class="dia" style="height: 450px">
+      <svg class="wires" viewBox="0 0 1344 420" style="top:30px; height:420px" aria-hidden="true">
+        <defs><marker id="ah-gold" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#f4b63c"/></marker></defs>
+        <path d="M300 210 C520 210 520 44 730 44" class="wire gold" marker-end="url(#ah-gold)"/>
+        <path d="M300 210 C520 210 520 154 730 154" class="wire gold" marker-end="url(#ah-gold)"/>
+        <path d="M300 210 C520 210 520 264 730 264" class="wire gold" marker-end="url(#ah-gold)"/>
+        <path d="M300 210 C520 210 520 374 730 374" class="wire gold" marker-end="url(#ah-gold)"/>
+        <text x="330" y="190" class="wire-label gold">deposit</text>
+      </svg>
+      <div class="node wallet-node" style="left:0; top:170px; width:300px; height:140px">
+        <small>Your wallet</small>
+        <strong>1,000,000 tJPY</strong>
+        <span>split four ways</span>
+      </div>
+      <div class="vault-row" style="top:30px"><span class="lock"></span><b>Swap pool A</b><em>250,000 locked</em><span class="share"><i style="width:25%"></i></span><span class="pct">25%</span></div>
+      <div class="vault-row" style="top:140px"><span class="lock"></span><b>Swap pool B</b><em>250,000 locked</em><span class="share"><i style="width:25%"></i></span><span class="pct">25%</span></div>
+      <div class="vault-row" style="top:250px"><span class="lock"></span><b>Limit order</b><em>250,000 locked</em><span class="share"><i style="width:25%"></i></span><span class="pct">25%</span></div>
+      <div class="vault-row" style="top:360px"><span class="lock"></span><b>Payment app</b><em>250,000 locked</em><span class="share"><i style="width:25%"></i></span><span class="pct">25%</span></div>
+      <span class="dia-note" style="left:740px; top:0">What each market can use</span>
     </div>
-    <div class="total"><strong>¼</strong> of the capital is available to any single market. The rest sits idle, and all of it is in custody.</div>
     <span class="num">02</span>
     <template class="note">
-      <p>Today, liquidity is fragmented. If I want to provide liquidity to an AMM, a limit order book, an RFQ desk and a payment flow, I split my capital four ways and deposit each piece into a different contract.</p>
-      <p>Each market only ever sees a quarter of my money, the rest is idle, and every piece carries custody risk.</p>
+      <p>Today, liquidity is fragmented. Whether you're an LP, a trader with limit orders, or an app that settles payments, every venue wants you to deposit first.</p>
+      <p>So one balance gets split: a quarter into this pool, a quarter into that one, a quarter into an order, a quarter into a payment app. Each market can only ever use its quarter, the rest sits idle, and all of it has left your wallet.</p>
     </template>
   </section>
 
@@ -256,40 +338,82 @@ template { display: none; }
   <section class="slide" data-time="0:40–1:05">
     <span class="kicker"><i></i>The idea</span>
     <h2>Grant a permission, not a deposit</h2>
-    <div class="fan">
-      <div class="wallet">
+    <p class="lede">A Sui Allowance lets Suijin pull from your balance only within rules you set. Coins stay put until a trade settles.</p>
+    <div class="dia" style="height: 420px">
+      <svg class="wires" viewBox="0 0 1344 420" aria-hidden="true">
+        <defs><marker id="ah-teal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2bc4b4"/></marker></defs>
+        <path d="M300 210 L372 210" class="wire teal dash" marker-end="url(#ah-teal)"/>
+        <path d="M680 210 C730 210 730 78 772 78" class="wire teal dash" marker-end="url(#ah-teal)"/>
+        <path d="M680 210 C730 210 730 210 772 210" class="wire teal dash" marker-end="url(#ah-teal)"/>
+        <path d="M680 210 C730 210 730 342 772 342" class="wire teal dash" marker-end="url(#ah-teal)"/>
+      </svg>
+      <div class="node wallet-node" style="left:0; top:140px; width:300px; height:140px">
         <small>Your wallet</small>
         <strong>1,000,000 tJPY</strong>
-        <p>A Sui Allowance lets Suijin pull <b class="hl">up to a cap</b>, <b class="hl">until an expiry</b>, <b class="hl">only through Suijin's contract</b>. Revoke it any time.</p>
+        <span class="teal">stays here</span>
       </div>
-      <div class="markets">
-        <div class="market"><span>Fixed · 150.41</span><span class="mbar"></span><em>1M</em></div>
-        <div class="market"><span>Curve · 0.30%</span><span class="mbar"></span><em>1M</em></div>
-        <div class="market"><span>Limit · 152.00</span><span class="mbar"></span><em>1M</em></div>
-        <div class="ratio"><span>Every market sees the full balance · shared, not leverage</span><strong>3.0×</strong></div>
+      <div class="node allow-node" style="left:380px; top:90px; width:300px; height:240px">
+        <small>Sui Allowance</small>
+        <ul>
+          <li><b>Cap</b> 1,000,000 tJPY</li>
+          <li><b>Expires</b> in 24 h</li>
+          <li><b>Only</b> through Suijin</li>
+          <li><b>Revoke</b> any time</li>
+        </ul>
       </div>
+      <div class="mkt-row" style="top:34px"><b>Fixed price</b><em>1 tUSD = 150.41</em><span class="share full"><i></i></span><span class="pct teal">100%</span></div>
+      <div class="mkt-row" style="top:162px"><b>Curve</b><em>0.30% fee</em><span class="share full"><i></i></span><span class="pct teal">100%</span></div>
+      <div class="mkt-row" style="top:294px"><b>Limit order</b><em>sell at 152.00</em><span class="share full"><i></i></span><span class="pct teal">100%</span></div>
+      <span class="dia-note" style="left:780px; top:0">What each market can use</span>
+      <span class="legend" style="left:0; top:330px"><i class="dash-key"></i>permission, no coins move</span>
     </div>
     <span class="num">03</span>
     <template class="note">
-      <p>Suijin flips that. Instead of depositing, you grant a Sui Allowance: a native, app-bound spending permission with a cap and an expiry that only our Move package can use.</p>
-      <p>That one permission can back many markets at once. Each market sees your full balance. It is not leverage: no combination of fills can ever spend more than you hold or more than your cap.</p>
+      <p>Suijin flips that. Instead of depositing, you grant a Sui Allowance: a native permission with a cap and an expiry that only our Move package can use, and you can revoke it any time.</p>
+      <p>Same wallet, same million tJPY, but now every market can quote against all of it. Nothing moved. It's not leverage either: fills can never spend more than you hold or more than your cap.</p>
     </template>
   </section>
 
   <!-- 4 -->
   <section class="slide" data-time="1:05–1:30">
     <span class="kicker"><i></i>How a trade settles</span>
-    <h2>Four steps, one PTB</h2>
-    <div class="steps">
-      <div class="step"><span class="n">1</span><b>Grant an Allowance</b><p>Capped, expiring, revocable, spendable only through Suijin. Nothing moves.</p><code>propose_for_app</code></div>
-      <div class="step"><span class="n">2</span><b>Open markets</b><p>Fixed price, curve or limit order, each drawing on the same budget.</p><code>create_fixed · create_curve</code></div>
-      <div class="step"><span class="n">3</span><b>Best route wins</b><p>Quotes read every budget fresh from a fullnode, so the price shown is the price Move recomputes.</p><code>POST /v1/quote</code></div>
-      <div class="step"><span class="n">4</span><b>Settle atomically</b><p>Two Allowance withdrawals in one PTB. Every check passes, or nothing moves.</p><code>settlement::fill</code></div>
+    <h2>Two sides meet in one PTB</h2>
+    <div class="dia" style="height: 480px">
+      <svg class="wires" viewBox="0 0 1344 480" aria-hidden="true">
+        <defs>
+          <marker id="ah-t4" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2bc4b4"/></marker>
+          <marker id="ah-g4" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#f4b63c"/></marker>
+        </defs>
+        <path d="M330 95 L392 95" class="wire teal dash" marker-end="url(#ah-t4)"/>
+        <path d="M600 95 L662 95" class="wire teal dash" marker-end="url(#ah-t4)"/>
+        <path d="M870 95 C920 95 920 170 952 170" class="wire teal dash" marker-end="url(#ah-t4)"/>
+        <path d="M330 385 L392 385" class="wire teal dash" marker-end="url(#ah-t4)"/>
+        <path d="M600 385 C780 385 780 310 952 310" class="wire teal dash" marker-end="url(#ah-t4)"/>
+      </svg>
+      <span class="lane" style="top:30px">Provider</span>
+      <span class="lane" style="top:320px">Trader</span>
+      <div class="node step-node" style="left:120px; top:40px"><span class="dot">1</span><b>Wallet</b><span>1,000,000 tJPY</span></div>
+      <div class="node step-node" style="left:392px; top:40px"><span class="dot">1</span><b>Allowance</b><span>grant a capped budget</span></div>
+      <div class="node step-node" style="left:662px; top:40px"><span class="dot">2</span><b>Market</b><span>fixed · 1 tUSD = 150.41</span></div>
+      <div class="node step-node" style="left:120px; top:330px"><span class="dot">3</span><b>Wallet</b><span>10 tUSD</span></div>
+      <div class="node step-node" style="left:392px; top:330px"><span class="dot">3</span><b>Order</b><span>exact approval · 5 min</span></div>
+      <div class="node ptb-node" style="left:960px; top:40px; width:384px; height:400px">
+        <span class="dot gold">4</span>
+        <small>One PTB · settlement::fill</small>
+        <ul class="checks">
+          <li>Recompute the price</li>
+          <li>Withdraw exact amounts</li>
+          <li>Pay fixed recipients</li>
+        </ul>
+        <div class="pay"><span>10 tUSD</span><i></i><span>Provider</span></div>
+        <div class="pay"><span>1,498.98 tJPY</span><i></i><span>Trader</span></div>
+        <em class="only">Coins move only here</em>
+      </div>
     </div>
     <span class="num">04</span>
     <template class="note">
-      <p>Here's the flow. One: the provider grants an allowance, nothing moves. Two: they open markets on it, fixed price, curve or limit. Three: a trader asks for a quote and the best route wins. Four: the executor settles it in one programmable transaction block that withdraws from both allowances.</p>
-      <p>If any check fails, the whole PTB reverts and no coins move.</p>
+      <p>Here's a trade end to end. On top, the provider: one, grant an allowance from the wallet; two, open a market on it. On the bottom, the trader: three, approve exactly ten tUSD and place an order. Dashed lines are permissions; nothing has moved yet.</p>
+      <p>Four: the executor settles it in one programmable transaction block. Move recomputes the price, withdraws the exact amounts from both allowances and pays both sides. That box is the only place coins ever move, and if any check fails, nothing moves at all.</p>
     </template>
   </section>
 
@@ -340,23 +464,34 @@ template { display: none; }
   <!-- 7 -->
   <section class="slide" data-time="2:20–2:40">
     <span class="kicker"><i></i>Security model</span>
-    <h2>The executor picks when, never what</h2>
-    <div class="can">
-      <div class="col yes"><h3>The executor can</h3><ul>
-        <li><div>Delay or skip an order<span>Traders' approvals expire in 5 minutes</span></div></li>
-        <li><div>Choose which fill goes first<span>Each order fills at most once</span></div></li>
-      </ul></div>
-      <div class="col no"><h3>The executor cannot</h3><ul>
-        <li><div>Change a price or amount<span>Move recomputes the output and checks both withdrawals exactly</span></div></li>
-        <li><div>Change who gets paid<span>Recipients are fixed in the market and the order</span></div></li>
-        <li><div>Go past a cap, an expiry or a real balance<span>The Sui framework enforces the Allowance</span></div></li>
-        <li><div>Keep your funds<span>Providers revoke any time; nothing is deposited</span></div></li>
-      </ul></div>
+    <h2>The executor picks when, Move decides what</h2>
+    <div class="gate">
+      <div class="node gate-who">
+        <small>Executor</small>
+        <b>Submits the fill</b>
+        <span>It can only choose when. It holds no funds and no way to spend an allowance outside Suijin.</span>
+      </div>
+      <span class="gate-arrow"></span>
+      <div class="node gate-checks">
+        <small>Move checks every fill</small>
+        <ul class="checks">
+          <li>Price recomputed on-chain</li>
+          <li>Output at least the trader's minimum</li>
+          <li>Withdrawals match exactly</li>
+          <li>Recipients fixed in market and order</li>
+          <li>Within cap, expiry and real balance</li>
+        </ul>
+      </div>
+      <span class="gate-arrow"></span>
+      <div class="gate-out">
+        <div class="node out ok"><small>All pass</small><b>Settled in one PTB</b></div>
+        <div class="node out bad"><small>Any fails</small><b>Reverts, nothing moves</b></div>
+      </div>
     </div>
     <span class="num">07</span>
     <template class="note">
-      <p>What about trust? Our executor only decides when a fill happens, never what. The Move contract recomputes every amount, checks both withdrawals exactly, and fixes the recipients. It cannot exceed a cap, an expiry or a real balance.</p>
-      <p>The worst it can do is delay an order, and the trader's approval expires in five minutes.</p>
+      <p>What about trust? Our executor only decides when a fill happens. The Move contract decides what: it recomputes the price, enforces the trader's minimum, checks both withdrawals exactly, and pays recipients that were fixed up front. The Sui framework enforces the cap, the expiry and the real balance.</p>
+      <p>If everything passes, it settles in one PTB. If anything fails, the whole transaction reverts and nothing moves. The worst the executor can do is delay, and the trader's approval expires in five minutes.</p>
     </template>
   </section>
 
