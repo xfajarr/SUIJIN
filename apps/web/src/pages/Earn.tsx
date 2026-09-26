@@ -274,10 +274,10 @@ const FEES = [
 ];
 const DEPTHS = [
   // Virtual pool = budget × depth; the budget still caps what can sell. Deeper = flatter price.
-  { value: 1, title: 'Full range', caption: 'Never sells out' },
-  { value: 5, title: 'Wide', caption: 'Moves up to 56%' },
-  { value: 20, title: 'Tight', caption: 'Moves up to 11%' },
-  { value: 100, title: 'Pegged', caption: 'Moves up to 2%' },
+  { value: 1, title: 'Very fast', caption: 'Keeps moving and never fully sells: safest for volatile pairs' },
+  { value: 5, title: 'Fast', caption: 'Moves 56% by the time all of it sells' },
+  { value: 20, title: 'Slow', caption: 'Moves 11% by the time all of it sells: good for most pairs' },
+  { value: 100, title: 'Barely', caption: 'Moves 2% by the time all of it sells: close to a fixed price' },
 ];
 const DURATIONS = [
   { value: 1, label: '1 h' },
@@ -412,8 +412,8 @@ export function Earn() {
                 {shape === 'curve' && (
                   <>
                     <div className="knob">
-                      <span>Depth</span>
-                      <Segmented label="Depth" value={depth} options={DEPTHS.map((o) => ({ value: o.value, label: o.title }))} onChange={setDepth} />
+                      <span>Price moves</span>
+                      <Segmented label="How fast your price moves" value={depth} options={DEPTHS.map((o) => ({ value: o.value, label: o.title }))} onChange={setDepth} />
                     </div>
                     <p className="knob-note">{DEPTHS.find((o) => o.value === depth)?.caption}</p>
                   </>
