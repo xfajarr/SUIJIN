@@ -156,7 +156,7 @@ function Landing() {
           <a href="#markets">Markets</a>
           <a href="#how">How it works</a>
           <a href="#how">Safety</a>
-          <a href="#top">Docs</a>
+          <a href={`${APP_URL}/#/docs`}>Docs</a>
         </nav>
         <a className="pill primary demo" href={APP_URL}>
           Launch testnet app
