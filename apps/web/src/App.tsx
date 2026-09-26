@@ -95,10 +95,10 @@ function Status() {
   const online = health.value?.ok === true;
   const outdated = online && health.value!.outdated;
   return (
-    <footer className="footnote inline" style={{ justifyContent: 'center' }}>
-      <span className={`chip ${outdated ? 'gold' : online ? 'accent' : health.error ? 'danger' : ''}`} title={SERVER}>
-        <span className={`dot${online ? ' live' : ''}`} />
-        {outdated ? 'Executor outdated' : online ? 'Executor online' : health.error ? 'Executor offline' : 'Checking executor…'}
+    <footer className="footnote">
+      <span className={`status ${outdated ? 'gold' : online ? 'ok' : health.error ? 'bad' : ''}`} title={SERVER}>
+        <span className="dot" />
+        {outdated ? 'Executor outdated' : online ? 'Executor online' : health.error ? 'Executor offline' : 'Checking executor'}
       </span>
       {(health.error || outdated) && <span>{outdated ? 'Restart it: bun run server' : 'Start it with bun run server'}</span>}
       <span>

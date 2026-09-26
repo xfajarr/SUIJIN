@@ -50,7 +50,8 @@ a:hover { color: var(--ink); }
 .nav a:hover { color: var(--ink); background: var(--accent-soft); }
 .nav a[aria-current='page'] { background: var(--accent); color: var(--accent-ink); }
 .net { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; padding: 5px 10px; border-radius: 999px; color: var(--gold); background: var(--gold-soft); border: 1px solid rgba(244, 182, 60, 0.3); }
-.footnote { text-align: center; font-size: 12px; color: var(--faint); }
+.footnote { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; color: var(--faint); }
+.status { display: inline-flex; align-items: center; gap: 6px; }
 @media (max-width: 860px) {
   .topbar { grid-template-columns: 1fr auto; }
   .nav { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; min-width: 0; justify-content: space-between; overflow-x: auto; scrollbar-width: none; }
