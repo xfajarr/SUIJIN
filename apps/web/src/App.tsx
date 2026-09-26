@@ -57,7 +57,7 @@ function Header({ current }: { current: string }) {
   return (
     <header className={`topbar${scrolled ? ' scrolled' : ''}`}>
       <a className="brand" href="https://suijin.xfajarr-web3.workers.dev" aria-label="Suijin home">
-        <img src="/logo.png" alt="" />
+        <img src="/icon.png" alt="" />
         <span>Suijin</span>
       </a>
       <Nav current={current} />

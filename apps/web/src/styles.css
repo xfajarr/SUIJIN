@@ -44,7 +44,7 @@ a:hover { color: var(--ink); }
 .topbar.scrolled { background: rgba(2, 8, 7, 0.78); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom-color: var(--line); }
 .topbar-actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; white-space: nowrap; }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; justify-self: start; }
-.brand img { width: 40px; height: 40px; mix-blend-mode: screen; }
+.brand img { width: 40px; height: 40px; object-fit: contain; }
 .brand span { font-family: 'Pixelify Sans', ui-monospace, monospace; font-size: 26px; line-height: 1; }
 .nav { position: relative; display: inline-flex; gap: 2px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); backdrop-filter: blur(14px); }
 .nav a { position: relative; z-index: 1; padding: 8px 16px; border-radius: 999px; color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px; transition: background-color 0.2s var(--ease), color 0.2s var(--ease); white-space: nowrap; }
