@@ -5,7 +5,7 @@
   "workspaces": ["packages/*", "apps/*", "scripts"],
   "scripts": {
     "test:move": "cd contracts/suijin && sui move test",
-    "test:ts": "bun test packages/sdk apps/server",
+    "test:ts": "bun test packages/sdk apps/server apps/web",
     "typecheck": "tsc -p tsconfig.json && tsc -p apps/web/tsconfig.json",
     "deploy": "bun scripts/deploy.ts testnet",
     "e2e": "bun scripts/e2e.ts",
