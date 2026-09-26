@@ -1,80 +1,85 @@
 <p align="center">
-  <img src="docs/assets/suijin-icon.png" alt="Suijin" width="160">
+  <img src="docs/assets/suijin-icon.png" alt="Suijin" width="140">
 </p>
 
 <h1 align="center">Suijin</h1>
 
-<p align="center"><b>One balance, many markets.</b></p>
+<p align="center">
+  <b>One balance, many markets.</b><br>
+  Self-custodial shared liquidity on Sui, built on native app-bound Allowances.
+</p>
 
-**One self-custodial wallet balance can back several markets on Sui.** A provider grants one bounded,
-revocable, app-bound Allowance. Funds stay in the provider's own address balance until a trade
-actually settles, and then it settles atomically in a single programmable transaction block (PTB).
+<p align="center">
+  <a href="https://suijin-app.pages.dev"><b>Live app</b></a> ·
+  <a href="https://suijin-api.xfajarr-web3.workers.dev/v1/health">API</a> ·
+  <a href="https://suiscan.xyz/testnet/object/0x9d82a68d5c4bbc3630bc9a02953970f4a435edab056f5126af64f59796c0b502">Package on Suiscan</a> ·
+  <a href="#proof-on-testnet">Proof transactions</a>
+</p>
 
-Built at ETHGlobal Tokyo 2026 for the Sui DeFi & Payments track. **Testnet only. Unaudited.**
-
-**Live:** app at [suijin-app.pages.dev](https://suijin-app.pages.dev), API at
-[suijin-api.xfajarr-web3.workers.dev](https://suijin-api.xfajarr-web3.workers.dev/v1/health).
-
-| Term | Meaning |
-|---|---|
-| **Provider** | Anyone who makes their tokens available to trade: a person, a DAO treasury, a token team, a payments app, a market maker. Called `maker` in the code. |
-| **Trader** | Anyone who swaps against that liquidity. Called `taker` in the code. |
-| **Allowance** | A native Sui permission: "this spender may pull up to X of my tokens until time T." Not a deposit. |
-| **Executor** | The service that submits settlement transactions. It can only act through Suijin's Move rules. |
+<p align="center">
+  ETHGlobal Tokyo 2026 · <b>Sui track: DeFi &amp; Payments</b> · Sui testnet · Unaudited hackathon code
+</p>
 
 ---
 
-## The problem
+## Summary
 
-Putting tokens to work on-chain almost always means **depositing them** into an AMM pool, an order
-book, a lending market or a vault. Every deposit:
+Putting tokens to work on-chain usually means **depositing** them into a pool, an order book or a
+vault. Each deposit locks a separate slice of your balance, hands custody to a contract, and serves
+only one venue.
 
-- **locks a separate slice** of your balance, so the same tokens can serve only one venue at a time;
-- **hands custody to a contract**, so you carry that protocol's risk and must withdraw to get your
-  funds back;
-- **sits idle** whenever that venue is quiet.
+Suijin removes the deposit. A provider grants **one Sui Allowance**: a native permission that is
+capped, expiring, revocable and bound to Suijin's Move package. Funds stay in the provider's own
+wallet. That single Allowance can back **several markets at once** (a curve, a fixed price, limit
+orders), and every trade settles atomically in **one programmable transaction block** that pulls
+both sides through their Allowances.
 
-This hits everyone who holds tokens, not only professionals:
+On top of that primitive the web app ships four products:
 
-- a person who wants to sell part of their balance at a target price;
-- a DAO or token team supporting its own market;
-- a payments app holding stablecoin float;
-- a market maker quoting several pairs.
+| Feature | What the user does | What happens underneath |
+|---|---|---|
+| **Swap** | Trade tUSD ⇄ tJPY, typing the amount in or the amount out | The trader signs an exact-cap payment Allowance + order; the executor settles both sides in one PTB |
+| **Pay** | Send someone an exact amount in the coin they want, or share a payment link | Exact-output quote; the order's recipient is the merchant, who gets at least the target |
+| **Earn** | Provide liquidity from a wallet: curve or fixed price, fee tier, depth, one or two sides | Budgets are Allowances; one budget can back many markets, nothing is deposited |
+| **Limit** | Sell at a chosen price, cancel any time | A fixed-price market on its own budget; cancel = revoke the Allowance |
+| **Portfolio** | See balances, budgets, markets, approvals and fills; pause or revoke | Reads the wallet's Allowances, strategies and `Fill` events |
 
-Liquidity ends up thin and fragmented, and capital stays locked where it is least needed.
+## Sui features used
 
-## The idea
+| Sui primitive | How Suijin uses it |
+|---|---|
+| **App-bound Allowances** (`sui::allowance`) | The custody layer. Providers' budgets and traders' payment approvals are Allowances whose spender is the executor and whose app is `suijin::app::App`. Only Suijin's package can mint the spend permit. |
+| **Address balances** | Coins live in plain wallet balances; settlement pulls from them with `tx.withdrawal({ from: 'allowance' })` and delivers with `balance::send_funds`. |
+| **Programmable transaction blocks** | One fill = one PTB with two Allowance withdrawals. Two budgets or two markets are created in one PTB. |
+| **Shared objects** | `Strategy` and `SwapOrder` are shared, so any executor transaction can settle them. |
+| **gRPC + GraphQL** | GraphQL for discovery and history (paginated); gRPC fullnode reads for anything that prices or settles, so quotes match what Move recomputes. |
+| **dApp Kit** | Wallet connection and signing in the web app. |
 
-Sui now has **address balances** and **native Allowances**. An Allowance is a permission, not a
-deposit: the owner names a spender, a cap and an expiry, and can revoke at any time. An
-**app-bound** Allowance can only be spent through one Move package, so that package's rules
-decide every pull.
-
-Suijin uses one app-bound Allowance as the custody layer for several markets at once:
+## How it works
 
 ```mermaid
 flowchart LR
     subgraph Wallets["Wallets (address balances)"]
-        P["Provider<br/>1,000,000 tJPY"]
+        P["Provider<br/>tJPY"]
         T["Trader<br/>tUSD"]
     end
-    subgraph Offchain["Off-chain"]
-        S["suijin server<br/>resolver + executor"]
+    subgraph Offchain["Cloudflare"]
+        W["Web app<br/>Pages"]
+        S["API: quotes + executor<br/>Worker"]
     end
     subgraph Sui["Sui testnet · package suijin"]
-        A[("Provider Allowance<br/>app-bound, capped, revocable")]
-        SA["Strategy A<br/>fixed rate"]
-        SB["Strategy B<br/>virtual curve"]
-        O["SwapOrder<br/>+ exact-cap trader Allowance"]
+        A[("Provider Allowance<br/>capped, expiring, revocable")]
+        SA["Strategy A<br/>fixed price"]
+        SB["Strategy B<br/>curve"]
+        O["SwapOrder<br/>+ exact-cap payment Allowance"]
         F{{"settlement::fill"}}
     end
     P -- "grant once" --> A
-    P -- "create" --> SA
-    P -- "create" --> SB
-    SA -. "quotes against" .-> A
-    SB -. "quotes against" .-> A
+    P -- "open markets" --> SA & SB
+    SA -. "draw on" .-> A
+    SB -. "draw on" .-> A
     T -- "one signature" --> O
-    S -- "reads strategies and balances" --> SA
+    W -- "quote / fill" --> S
     S -- "one PTB" --> F
     F -- "pull tJPY" --> A
     F -- "pull tUSD" --> O
@@ -82,213 +87,222 @@ flowchart LR
     F -- "tJPY" --> T
 ```
 
-Both strategies advertise the full 1,000,000 tJPY, a **Shared Liquidity Ratio** of 2.0×. Only
-1,000,000 real tJPY exists, and every fill draws on the same balance and the same Allowance cap, so
-fills can never spend more than is really there. The provider never deposits anything.
+**1. Provide (Earn, Limit).** The provider signs one transaction that creates an Allowance
+(`allowance::propose_for_app` + `app::issue_maker_allowance`): spender = executor, cap = budget,
+with an expiry. No funds move. A second transaction opens markets on it
+(`strategy::create_fixed` / `create_curve`). Opening another market on the same budget needs only
+that second step: both markets advertise the same balance, which is the *Shared Liquidity Ratio*
+(2.0× here), and every fill still draws on one real balance and one cap.
 
-## A trade, end to end
+**2. Quote.** The API finds strategies for the requested direction, re-reads them from a fullnode,
+and caps each route by what can really settle: the provider's balance, the budget left, the
+market's remaining size and its per-fill limit. Paused, expired and revoked markets are skipped.
+Best route first; the minimum received is enforced later on-chain.
+
+**3. Order (Swap, Pay).** The trader signs one transaction: an Allowance for **exactly** the quoted
+input, valid for five minutes, plus a `SwapOrder` (market, minimum out, recipient, expiry). Nothing
+moves yet. For Pay, the order's recipient is the merchant and the quote is exact-output.
+
+**4. Settle.** The executor submits one PTB calling `settlement::fill`, which pulls the provider's
+coins and the trader's payment through their Allowances and delivers both sides. The executor
+chooses **when** to settle, never **what**:
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Provider
     actor Trader
-    participant Server as suijin server
-    participant Chain as Sui (suijin package)
-    Provider->>Chain: mint tJPY into the provider address balance
-    Provider->>Chain: allowance::propose_for_app + app::issue_maker_allowance
-    Note right of Chain: Allowance (shared) + AllowanceCap<br/>no funds move
-    Provider->>Chain: strategy::create_fixed and strategy::create_curve
-    Note right of Chain: two strategies, one Allowance
-    Trader->>Server: POST /v1/quote with quoteIn
-    Server->>Chain: read strategies and allowances (GraphQL), balances (gRPC)
-    Server-->>Trader: executable quotes, best first
-    Trader->>Chain: propose_for_app (cap = quoteIn) + order::create
-    Note right of Chain: trader Allowance + SwapOrder<br/>no funds move
-    Trader->>Server: POST /v1/orders/{id}/fill with takerAllowanceId
-    Server->>Server: wait for the indexer, pre-check the fill
-    Server->>Chain: one PTB: settlement::fill with two allowance withdrawals
-    Chain->>Chain: recompute price, check caps, expiry and recipients
-    Chain-->>Provider: tUSD into the provider address balance
-    Chain-->>Trader: tJPY into the trader address balance
-    Server-->>Trader: ok + transaction digest
-    Provider->>Chain: allowance::revoke (any time)
-    Note right of Chain: every later fill fails
+    participant API as API (executor)
+    participant Move as settlement::fill
+    Trader->>API: POST /v1/quote
+    API-->>Trader: executable routes, best first
+    Trader->>Move: sign payment Allowance + SwapOrder (no funds move)
+    Trader->>API: POST /v1/orders/{id}/fill
+    API->>API: fresh reads, pre-check the fill
+    API->>Move: one PTB, two Allowance withdrawals
+    Move->>Move: executor? order open? right Allowances?<br/>recompute price, output ≥ minimum,<br/>withdrawn amounts exact?
+    Move-->>Trader: output to recipient's address balance
+    Move-->>Trader: Fill event, order marked filled
 ```
 
-## What `settlement::fill` checks
+If any check fails, the whole PTB reverts and nothing moves. The executor pays settlement gas; the
+trader only pays for the order.
 
-The executor chooses **when** to settle, never **what**. Every amount and recipient comes from Move.
+**5. Manage (Portfolio).** Pause or resume a market (`strategy::set_active`), revoke a budget
+(`allowance::revoke`, every market on it stops), revoke an unspent payment approval, and review
+fills from `settlement::Fill` events.
 
-```mermaid
-flowchart TD
-    start(["executor submits one PTB"]) --> pre{"Sui pre-checks:<br/>allowances are inputs, funders match,<br/>sender is the spender, coin types match"}
-    pre -- "no" --> rejected["rejected before execution"]
-    pre -- "yes" --> c1{"protocol live and<br/>sender is the executor?"}
-    c1 -- "no" --> abort
-    c1 -- "yes" --> c2{"order open, not expired,<br/>for this strategy?"}
-    c2 -- "no" --> abort
-    c2 -- "yes" --> c3{"provider Allowance is the strategy's,<br/>trader Allowance has the trader as funder,<br/>exact cap and same expiry?"}
-    c3 -- "no" --> abort
-    c3 -- "yes" --> c4{"recomputed output within strategy limits<br/>and at least the trader minimum?"}
-    c4 -- "no" --> abort
-    c4 -- "yes" --> spend["spend both Allowances<br/>via the package-only permit"]
-    spend --> c5{"withdrawn balances equal<br/>the computed amounts exactly?"}
-    c5 -- "no" --> abort
-    c5 -- "yes" --> settle["update strategy, mark order filled,<br/>tUSD to provider, tJPY to recipient, emit Fill"]
-    abort["abort: the whole PTB reverts, nothing moves"]
-```
+### Pricing
 
-## Order lifecycle
+- **Fixed price:** `base_out = floor(quote_in × price_den / price_num)`. One rate for every fill;
+  the fee tier is baked into the price as a spread.
+- **Curve:** constant product `x · y = k` on **virtual** reserves, fee taken from the input. Depth
+  (1×, 2×, 5× the budget) sets how far the price moves before the budget sells out.
+- Formulas live in `contracts/suijin/sources/math.move`, run in u128, round in the provider's
+  favour, and are mirrored exactly in `packages/sdk/src/math.ts` with shared test vectors.
 
-```mermaid
-stateDiagram-v2
-    [*] --> Open: trader creates order
-    Open --> Filled: executor settles
-    Open --> Cancelled: trader cancels
-    Open --> Expired: clock passes expiry
-    Filled --> [*]
-    Cancelled --> [*]
-    Expired --> [*]
-```
-
-`Expired` is logical: the object stays open on chain, but `fill` refuses it.
-
-## Pricing
-
-Both formulas live in `contracts/suijin/sources/math.move` and are mirrored byte-for-byte in
-`packages/sdk/src/math.ts`. The same test vectors run in Move and in TypeScript.
-
-- **Fixed rate:** `base_out = floor(quote_in × price_den / price_num)`.
-- **Virtual curve:** constant product `x · y = k` on virtual reserves, with the fee taken from the
-  input. The new base reserve rounds **up**, so rounding dust always stays with the provider.
-- All math runs in u128, so u64 inputs cannot overflow.
-
-## Security model
+### Security model
 
 | The executor can | The executor cannot |
 |---|---|
 | Delay or censor orders | Change a price or amount: Move recomputes both and checks the withdrawn balances exactly |
-| Choose the order of fills | Change a recipient: the provider is fixed in the strategy, the trader's recipient in the order |
-| | Spend through any other path: only `suijin::app` can mint a spend permit, and only `settlement::fill` uses it |
-| | Exceed a cap, an expiry or the real balance: the Sui framework enforces these |
+| Choose the order of fills | Change a recipient: fixed in the strategy and the order |
+| | Spend any other way: only `suijin::app` mints the spend permit, and only `settlement::fill` uses it |
+| | Exceed a cap, an expiry or a real balance: the Sui framework enforces these |
 
-The provider can revoke at any time. Revocation deletes the Allowance, so no later fill can even be
-built.
+Providers can revoke at any time; revocation deletes the Allowance, so no later fill can be built.
+Traders approve an exact amount that expires in five minutes, and each order fills at most once.
 
-## Live on Sui testnet
+## How it's made
 
-| Object | ID |
+- **Move** (`contracts/suijin`): five modules. `app` binds Allowances to the package and owns the
+  only spend path; `math`, `strategy`, `order`, `settlement`. 26 Move tests. `contracts/mock_coins`
+  provides tUSD and tJPY with open faucets.
+- **TypeScript SDK** (`packages/sdk`, `@mysten/sui` 2.33): transaction builders for every entry
+  point, a quote engine (exact input and exact output), GraphQL and gRPC readers, and the Move math
+  mirrored for off-chain pricing.
+- **API** (`apps/server`): one fetch handler for quotes and fills. It runs on Bun locally and as a
+  **Cloudflare Worker** in production, with the executor key stored as a Worker secret.
+- **Web app** (`apps/web`): React 19, Vite and `@mysten/dapp-kit-react`, deployed on **Cloudflare
+  Pages**. No UI framework; hand-written CSS with skeleton loading, toasts and a transaction stepper.
+- **Tooling:** Bun workspaces, 39 TypeScript tests, live end-to-end scripts that run real testnet
+  transactions against a local or deployed API.
+
+Notable problems solved during the hackathon:
+
+- **Indexer lag.** Quotes priced on GraphQL state sometimes failed at settlement after a trade
+  moved the curve. Quotes and the executor now read from a fullnode over gRPC, and exact-output
+  orders carry a slippage buffer on the input.
+- **Racing the fullnode.** A fill request can arrive before the order is visible; the executor
+  retries its reads briefly before planning the fill.
+- **Two transactions for a new budget.** A shared Allowance cannot be used in the same PTB that
+  created it, so granting a budget and opening markets on it are two signatures (one when reusing a
+  budget).
+
+## Deployments
+
+| | |
 |---|---|
-| Package `suijin` | [`0x9d82a68d5c4bbc3630bc9a02953970f4a435edab056f5126af64f59796c0b502`](https://suiscan.xyz/testnet/object/0x9d82a68d5c4bbc3630bc9a02953970f4a435edab056f5126af64f59796c0b502) |
+| Web app | https://suijin-app.pages.dev |
+| API | https://suijin-api.xfajarr-web3.workers.dev |
+| Package `suijin` | [`0x9d82a68d…b502`](https://suiscan.xyz/testnet/object/0x9d82a68d5c4bbc3630bc9a02953970f4a435edab056f5126af64f59796c0b502) |
 | `ProtocolConfig` | `0x87b126f7464d89a494ea1c61eba8ae4180fcd144e846ab45dd8dc86edf43e494` |
-| Executor (spender) | `0x13478f81bc94b611fc8d26f29dff4eba7449a175bf7cf193c9d90bf4970ff8a6` |
-| Package `mock_coins` (tUSD, tJPY) | [`0xc3bbdde31c8bba5c5ae568de8aad7edf2e4be4f0023e5fc5a4da3d1e8e5d2ec4`](https://suiscan.xyz/testnet/object/0xc3bbdde31c8bba5c5ae568de8aad7edf2e4be4f0023e5fc5a4da3d1e8e5d2ec4) |
+| Executor (Allowance spender) | `0x13478f81bc94b611fc8d26f29dff4eba7449a175bf7cf193c9d90bf4970ff8a6` |
+| Package `mock_coins` | [`0xc3bbdde3…2ec4`](https://suiscan.xyz/testnet/object/0xc3bbdde31c8bba5c5ae568de8aad7edf2e4be4f0023e5fc5a4da3d1e8e5d2ec4) |
 | tUSD faucet | `0xcf668b5b489e7c2d50ed09cf1419aeef80e35975a21bd15a8d462869b295f359` |
 | tJPY faucet | `0x7c0dbf7cb90f5216117ab875c7bf3c788f35079aad3f1645e6a6949fffa547ee` |
 
-The same IDs are in `packages/sdk/src/deployment.json`. tUSD and tJPY are test coins with open
-faucets and no value. Both use 6 decimals.
+All IDs are also in `packages/sdk/src/deployment.json`. tUSD and tJPY are test coins with no
+value; both use 6 decimals.
 
-## Proof
-
-From `bun run e2e` and `bun run smoke` on testnet:
+## Proof on testnet
 
 | Step | Transaction |
 |---|---|
 | Provider grants one app-bound Allowance | [21UMDykb…](https://suiscan.xyz/testnet/tx/21UMDykb1nC7sjiB5nu9MP7X1ohmhArBhkrJy8atM5Lt) |
-| Fixed-rate strategy on that Allowance | [4hJZkUmz…](https://suiscan.xyz/testnet/tx/4hJZkUmzxncJ5w1z8dBfjAoZYSr7m4vhfZtaTJatrHYo) |
+| Fixed-price strategy on that Allowance | [4hJZkUmz…](https://suiscan.xyz/testnet/tx/4hJZkUmzxncJ5w1z8dBfjAoZYSr7m4vhfZtaTJatrHYo) |
 | Curve strategy on the same Allowance (zero tJPY moved) | [5sXjSR9C…](https://suiscan.xyz/testnet/tx/5sXjSR9CedaTPTPuNkn1kjbC7pMrJU85eyBPQdBd4VpT) |
 | Trader: exact-cap payment Allowance + order, one signature | [JAwmkCVF…](https://suiscan.xyz/testnet/tx/JAwmkCVFiaLTGSbTvx5b936JSNVxHUQazv6wUji6Ggr9) |
 | **Fill: one PTB, two Allowance withdrawals** | [4gTnkPqs…](https://suiscan.xyz/testnet/tx/4gTnkPqsS7xaWog9N93tNHK1ba4LV99WSRyWMsyWM6an) |
-| Executor asks for more than the quote | refused before execution (abort code 5, `EWrongMakerAmount`) |
-| Provider revokes, next fill fails | [3XPqqxYP…](https://suiscan.xyz/testnet/tx/3XPqqxYP9nYmwUNCFkeyjpaNPSmudwcMTxF1SFykjK6L) |
+| Executor asks for more than the quote | refused before execution (`EWrongMakerAmount`) |
+| Provider revokes, the next fill fails | [3XPqqxYP…](https://suiscan.xyz/testnet/tx/3XPqqxYP9nYmwUNCFkeyjpaNPSmudwcMTxF1SFykjK6L) |
 | Fill requested over HTTP right after the order | [2GddsdppM…](https://suiscan.xyz/testnet/tx/2GddsdppM5AZXDPy9oQLwQWNNgjjxKU2xP3NpJKHDTsa) |
-| Web app, Pay: recipient gets exactly 5 tUSD, payer spends tJPY (order) | [B7nUsT7E…](https://suiscan.xyz/testnet/tx/B7nUsT7EnQUDnEpfjyzLz69KHgKyYr7cHbQDRThwRhc6) |
-| Web app, Pay: settlement on the reverse market | [6GphQuaG…](https://suiscan.xyz/testnet/tx/6GphQuaGGtFg6w3DhJGRq7vaahQ63JpDJFTVckTyS2qm) |
+| Pay from the web app: recipient gets exactly 5 tUSD, payer spends tJPY | [B7nUsT7E…](https://suiscan.xyz/testnet/tx/B7nUsT7EnQUDnEpfjyzLz69KHgKyYr7cHbQDRThwRhc6) · [6GphQuaG…](https://suiscan.xyz/testnet/tx/6GphQuaGGtFg6w3DhJGRq7vaahQ63JpDJFTVckTyS2qm) |
+
+## Try it
+
+1. Open **https://suijin-app.pages.dev** and connect a Sui wallet set to **testnet**.
+2. Get testnet SUI for gas (the header links to the Sui faucet when your balance is zero), then
+   press **Faucet** for 1,000 tUSD and 150,000 tJPY.
+3. **Swap** a few tUSD for tJPY, or **Pay** an exact amount to any address.
+4. **Earn**: open a two-sided market, then open a second one on the existing budget and watch the
+   shared-liquidity figure in **Portfolio**.
+5. **Limit**: place a sell order above the market price, then cancel it from the orders table.
+
+## Run locally
+
+Requirements: Bun 1.3+ and the Sui CLI **1.80 or newer** (older CLIs have no `sui::allowance`).
+
+```bash
+bun install
+cp .env.example .env      # EXECUTOR_, MAKER_ (provider), TAKER_ (trader) SECRET_KEY = suiprivkey1...
+bun run server            # API on http://localhost:8790 (uses the testnet deployment in deployment.json)
+bun run web               # web app on http://localhost:5173
+```
+
+<details>
+<summary>More commands: deploy contracts, live tests, Cloudflare deploy, burner wallet</summary>
+
+```bash
+bun run deploy            # publish the Move packages with the executor key, write deployment.json
+bun run e2e               # live end-to-end proof (needs funded provider and trader keys)
+bun run smoke             # live HTTP test against a running API
+bun run smoke:defi        # two-sided liquidity, reverse swap and exact-output payment over HTTP
+SERVER_URL=https://suijin-api.xfajarr-web3.workers.dev bun run smoke:defi   # against the deployed API
+
+cd contracts/suijin && sui move test   # 26 Move tests
+bun run test:ts                        # 39 TypeScript tests
+bun run typecheck                      # sdk, server, scripts and web app
+```
+
+Cloudflare (after `bunx wrangler login`):
+
+```bash
+cd apps/server && bunx wrangler deploy
+grep ^EXECUTOR_SECRET_KEY= ../../.env | cut -d= -f2- | bunx wrangler secret put EXECUTOR_SECRET_KEY
+cd ../web && bun run deploy:pages
+```
+
+The web app reads `VITE_SERVER_URL` (default `http://localhost:8790`; production builds use
+`apps/web/.env.production`). `VITE_BURNER=1 bun run web` adds an in-browser burner wallet for
+rehearsals without an extension.
+
+</details>
 
 ## Repository layout
 
 ```
-contracts/suijin/      Move: app (Allowance binding), math, strategy, order, settlement + 26 tests
+contracts/suijin/      Move: app, math, strategy, order, settlement (+ 26 tests)
 contracts/mock_coins/  Move: tUSD and tJPY test coins with open faucets
-packages/sdk/          TypeScript: transaction builders, chain reads, math mirror, quote engine
-apps/server/           POST /v1/quote (resolver) and POST /v1/orders/:id/fill (executor): Bun locally, a Cloudflare Worker live
-apps/web/              web app: Swap, Pay, Earn, Limit, Portfolio (React + dApp Kit)
-scripts/               deploy.ts, e2e.ts (live proof), smoke-server.ts, smoke-defi.ts (live HTTP tests)
-docs/superpowers/plans implementation plan with every design decision
+packages/sdk/          TypeScript SDK: builders, readers, quote engine, math mirror
+apps/server/           API: quotes + executor (Bun locally, Cloudflare Worker live)
+apps/web/              Web app: Swap, Pay, Earn, Limit, Portfolio
+scripts/               deploy, live end-to-end and smoke tests
+docs/                  implementation plan and assets
 ```
 
-## Run it
+<details>
+<summary>API reference</summary>
 
-You need Bun 1.3+ and the Sui CLI **1.80 or newer** (`brew upgrade sui`). Older CLIs have no
-`sui::allowance`.
-
-```bash
-bun install
-cp .env.example .env           # EXECUTOR_, MAKER_ (provider), TAKER_ (trader) SECRET_KEY = suiprivkey1...
-bun run deploy                 # publishes with the executor key, writes deployment.json
-bun run server                 # resolver + executor on http://localhost:8790
-bun run e2e                    # live end-to-end proof (needs funded provider and trader keys)
-bun run smoke                  # live HTTP test against the running server
-bun run smoke:defi             # two-sided liquidity, reverse swap and exact-output payment over HTTP
-bun run web                    # web app on http://localhost:5173
-```
-
-The web app reads `VITE_SERVER_URL` (default `http://localhost:8790`; production builds use
-`apps/web/.env.production`). To rehearse without a wallet extension, start it with `VITE_BURNER=1`:
-dApp Kit then offers an in-browser burner wallet (fund it with testnet SUI, then press Faucet for tUSD
-and tJPY).
-
-Deploy (Cloudflare, logged in with `bunx wrangler login`):
-
-```bash
-cd apps/server && bunx wrangler deploy                    # API: the same routes as bun run server, as a Worker
-grep ^EXECUTOR_SECRET_KEY= ../../.env | cut -d= -f2- | bunx wrangler secret put EXECUTOR_SECRET_KEY
-cd ../web && bun run deploy:pages                         # app: builds and uploads to Cloudflare Pages
-SERVER_URL=https://suijin-api.xfajarr-web3.workers.dev bun run smoke:defi   # live check of the deployed API
-```
-
-Tests:
-
-```bash
-cd contracts/suijin && sui move test   # 26 Move tests
-bun run test:ts                        # 39 TypeScript tests
-bunx tsc -p tsconfig.json              # typecheck sdk, server, scripts
-```
-
-## API for frontends
-
-All amounts are integer strings in base units (6 decimals for tUSD and tJPY). Field and function
-names use the code's terms: `maker` means provider, `taker` means trader.
+All amounts are integer strings in base units (6 decimals). In code, `maker` means provider and
+`taker` means trader.
 
 | Endpoint | Body | Response |
 |---|---|---|
-| `GET /v1/health` | | `{ ok, network, executor }` |
-| `GET /v1/strategies` | | every strategy with its live state |
-| `POST /v1/quote` | `{ "sell": "tUSD", "buy": "tJPY", "amountIn": "10000000", "slippageBps": 50 }` | executable quotes, best first: `strategyId, kind, maker, makerAllowanceId, baseType, quoteType, quoteIn, baseOut, minBaseOut, expiresAtMs, impactBps, feeBps` |
+| `GET /v1/health` | | `{ ok, network, executor, api }` |
+| `GET /v1/strategies` | | every strategy with its state |
+| `POST /v1/quote` | `{ "sell": "tUSD", "buy": "tJPY", "amountIn": "10000000", "slippageBps": 50 }` | routes, best first: `strategyId, kind, maker, makerAllowanceId, baseType, quoteType, quoteIn, baseOut, minBaseOut, expiresAtMs, impactBps, feeBps` |
 | `POST /v1/orders/{orderId}/fill` | `{ "takerAllowanceId": "0x…" }` | `{ ok: true, digest }`, or `{ ok: false, error }` with HTTP 409 |
 
-Quote bodies: `sell` and `buy` are `tUSD`, `tJPY` or full coin types, in either direction. Send
-`amountIn` (exact input: most output first) or `amountOut` (exact output, as Pay uses: cheapest input
-first, `minBaseOut` equals the target and `quoteIn` carries the `slippageBps` buffer). `slippageBps`
-is 0 to 1000, default 100. The original `{ "quoteIn": "…" }` body still means pay tUSD, receive tJPY.
-Quotes are priced from fullnode state, not the indexer, so they match what settlement recomputes.
+`sell` and `buy` accept `tUSD`, `tJPY` or full coin types, in either direction. Send `amountIn`
+(exact input) or `amountOut` (exact output: `minBaseOut` equals the target and `quoteIn` carries the
+`slippageBps` buffer). `slippageBps` is 0 to 1000, default 100. Fill errors include
+`ORDER_ALREADY_FILLED`, `ORDER_EXPIRED`, `STRATEGY_PAUSED`, `ALLOWANCE_REVOKED`,
+`WRONG_TAKER_ALLOWANCE` and `SLIPPAGE_EXCEEDED`; the on-chain order status is the replay guard.
 
-Fill errors include `ORDER_ALREADY_FILLED`, `ORDER_EXPIRED`, `STRATEGY_PAUSED`,
-`ALLOWANCE_REVOKED`, `WRONG_TAKER_ALLOWANCE` and `SLIPPAGE_EXCEEDED`. Repeating a fill request
-returns the same digest while the server process is running. After a restart the answer is
-`ORDER_ALREADY_FILLED`. The on-chain order status is the real replay guard.
+</details>
 
-The wallet side comes from `@suijin/sdk`. Every builder returns an unsigned `Transaction`:
+<details>
+<summary>SDK usage</summary>
+
+Every builder in `@suijin/sdk` returns an unsigned `Transaction`:
 
 ```ts
 import { createTakerOrder } from '@suijin/sdk';
 
-const [best] = await fetch(`${SERVER}/v1/quote`, {
+const [best] = await fetch(`${API}/v1/quote`, {
   method: 'POST',
   headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ quoteIn: '10000000' }),
+  body: JSON.stringify({ sell: 'tUSD', buy: 'tJPY', amountIn: '10000000' }),
 }).then((r) => r.json());
 
 const tx = createTakerOrder({
@@ -300,62 +314,45 @@ const tx = createTakerOrder({
   recipient: account.address,
   pair: { base: best.baseType, quote: best.quoteType },
 });
-// Sign with the wallet, then read the effects with { effects: true, objectTypes: true }:
-// the created '::order::SwapOrder<' is orderId, the created '::allowance::Allowance<' is takerAllowanceId.
-await fetch(`${SERVER}/v1/orders/${orderId}/fill`, {
+// Sign, then read effects with { effects: true, objectTypes: true }: the created
+// '::order::SwapOrder<' is the orderId, the created '::allowance::Allowance<' the takerAllowanceId.
+await fetch(`${API}/v1/orders/${orderId}/fill`, {
   method: 'POST',
   headers: { 'content-type': 'application/json' },
   body: JSON.stringify({ takerAllowanceId }),
 });
 ```
 
-The other builders (each takes an optional `pair`; the default market sells tJPY for tUSD):
-- Provider: `issueMakerAllowance`, `issueAllowances` (several budgets, one PTB), `createFixedStrategy`,
-  `createCurveStrategy`, `createStrategies` (several markets, one PTB), `setStrategyActive`, `revokeAllowance`
-- Trader: `cancelOrder`
+- Provider: `issueMakerAllowance`, `issueAllowances`, `createFixedStrategy`, `createCurveStrategy`,
+  `createStrategies`, `setStrategyActive`, `revokeAllowance`
+- Trader: `createTakerOrder`, `cancelOrder`
 - Test coins: `mintTestCoin`, `mintTestCoins`
+- Readers: `listStrategies`, `getStrategy`, `getOrder`, `getAllowance`, `listAllowanceCaps`,
+  `listFills`, `addressBalance` (GraphQL) and `freshStrategies`, `freshAllowances`, `freshOrder`
+  (gRPC, no indexer lag)
 
-The readers are `listStrategies`, `getStrategy`, `getOrder`, `getAllowance`, `listAllowanceCaps`,
-`listFills` and `addressBalance` (GraphQL, for discovery and history), plus `freshStrategies`,
-`freshAllowances` and `freshOrder` (gRPC, no indexer lag, for anything that prices or settles).
-
-## Web app
-
-| Page | What a user does | What it shows about the mechanism |
-|---|---|---|
-| Swap | Trade either direction, typing the amount in or the amount out | One signature: an exact-cap payment Allowance plus the order. The executor settles both sides in one PTB and pays that gas |
-| Pay | Send someone an exact amount in the coin they want, or share a request link | Exact-output quotes: the recipient gets at least the target, any surplus goes to them |
-| Earn | Provide both sides of a market from one wallet: curve or fixed price, fee tier, depth | Budgets are Allowances. One budget can back several markets: nothing is deposited |
-| Limit | Place fixed-price sell orders | A fixed-price strategy on its own budget. Nothing is locked while it waits |
-| Portfolio | See budgets, markets, unspent approvals and fills | Revoking deletes the Allowance, and every market on it stops |
+</details>
 
 ## Positioning
 
-- **DeepBook** unifies order flow.
-- **STEAMM** optimizes deposited liquidity.
-- **Suijin** lets self-custodial balances serve many markets before anything is committed to a
-  venue.
+- **DeepBook** unifies order flow. **STEAMM** optimizes deposited liquidity. **Suijin** lets
+  self-custodial balances serve many markets before anything is committed to a venue.
+- The shared-liquidity idea comes from 1inch Aqua (explored on EVM by Aqua0). Suijin rebuilds it on
+  Sui primitives, and the settlement model is close to intent systems like UniswapX, using native
+  Allowances instead of off-chain signatures.
 
-The shared-liquidity insight comes from 1inch Aqua; Aqua0 explored it on EVM. Suijin rebuilds it
-on Sui primitives: address balances, app-bound Allowances and PTBs.
+## Limitations
 
-## What we do not claim
-
-- The Shared Liquidity Ratio is availability, not TVL, not collateral and not leverage.
-- Not every advertised position can fill at the same time.
-- An Allowance is a permission, not a guarantee: a provider can move their funds at any time.
-- The single executor can delay or censor orders.
-- Allowances are enabled on Sui testnet and devnet, not yet on mainnet (checked 26 Sep 2026).
-- This code is unaudited hackathon software.
+- The Shared Liquidity Ratio is availability, not TVL, collateral or leverage: not every advertised
+  market can fill at the same time.
+- An Allowance is a permission, not a guarantee; a provider can move funds, and fills then fail.
+- A single executor can delay or censor orders (it cannot steal).
+- Prices are set by providers; there is no oracle yet.
+- Sui Allowances are live on testnet and devnet only, not yet on mainnet.
+- Unaudited hackathon code.
 
 ## Roadmap
 
-- Signed RFQ quotes: price updates cost nothing.
-- Oracle-priced and stable curves.
-- Dutch auctions.
-- A pause-only risk guard.
-- A bonded solver network.
-- DeepBook routing.
-- Managed liquidity through operator caps.
-- Pay with any token.
-- Mainnet, once Allowances ship there and after an audit.
+Signed RFQ quotes · oracle-priced and stable curves · Dutch auctions · a bonded solver network
+instead of one executor · DeepBook routing · managed liquidity through operator caps · pay with any
+token · mainnet once Allowances ship there, after an audit.
