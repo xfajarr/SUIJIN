@@ -1,0 +1,5 @@
+[package]
+name = "suijin"
+edition = "2024"
+
+[dependencies]
