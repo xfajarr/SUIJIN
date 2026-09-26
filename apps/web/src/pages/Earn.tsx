@@ -524,6 +524,8 @@ function Preview({ plan, P, shape, feeBps, depth, expiresAtMs, now }: { plan: Si
         const feePart = total === null || flat === null ? null : shape === 'fixed' ? total - flat : total * fee;
         const shared = s.budget && s.amount ? budgetRatio(s.budget, s.balance, now, s.amount) : null;
         const dash = <span className="faint">—</span>;
+        // Returns against selling the same amount at the market price (`flat`).
+        const pctOf = (x: number) => `+${(flat ? (x / flat) * 100 : 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}%`;
         return (
           <div className="preview-side" key={s.coin}>
             <div className="pv-title">
@@ -547,9 +549,12 @@ function Preview({ plan, P, shape, feeBps, depth, expiresAtMs, now }: { plan: Si
               <span>You get</span>
               <span>
                 {total !== null ? (
-                  <b className="gold">
-                    ≈ {num(total)} {pay}
-                  </b>
+                  <>
+                    <b className="gold">
+                      ≈ {num(total)} {pay}
+                    </b>
+                    {shape === 'curve' && flat !== null && <span className="faint"> · {pctOf(total - flat)} vs market</span>}
+                  </>
                 ) : amount !== null ? (
                   <span className="faint">never fully sells</span>
                 ) : (
@@ -559,7 +564,18 @@ function Preview({ plan, P, shape, feeBps, depth, expiresAtMs, now }: { plan: Si
             </div>
             <div className="kv">
               <span>Fee earned</span>
-              <span>{feePart === null || total === null ? dash : <b>≈ {num(feePart)} {pay}</b>}</span>
+              <span>
+                {feePart === null || total === null ? (
+                  dash
+                ) : (
+                  <>
+                    <b>
+                      ≈ {num(feePart)} {pay}
+                    </b>
+                    <b className="ok"> · {pctOf(feePart)}</b>
+                  </>
+                )}
+              </span>
             </div>
             {shared && (
               <div className="kv">
