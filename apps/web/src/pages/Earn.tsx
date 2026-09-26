@@ -153,14 +153,14 @@ export function FlowPanel(p: {
           {flow.grantDigest && <TxLink digest={flow.grantDigest}>Budget tx</TxLink>}
           {flow.openDigest && <TxLink digest={flow.openDigest}>Market tx</TxLink>}
         </div>
+        <a className="cta" href="#/portfolio">
+          View in Portfolio
+        </a>
         <div className="inline receipt-actions">
-          <a className="btn" href="#/portfolio">
-            View in Portfolio
-          </a>
-          <a className="btn ghost" href="#/swap">
+          <a className="link-btn" href="#/swap">
             Trade against it
           </a>
-          <button type="button" className="btn ghost" onClick={flow.reset}>
+          <button type="button" className="link-btn" onClick={flow.reset}>
             {p.again}
           </button>
         </div>
@@ -376,7 +376,7 @@ export function Earn() {
       <div className="page-head">
         <div>
           <h1>Earn</h1>
-          <p>Quote liquidity straight from your wallet. Grant a capped budget, set a price, and earn on every fill. Nothing is deposited.</p>
+          <p>Quote liquidity from your wallet with a capped budget. Nothing is deposited.</p>
         </div>
       </div>
       <div className="split">
@@ -573,20 +573,10 @@ function Preview({ plan, P, shape, feeBps, depth, expiresAtMs, now }: { plan: Si
           </div>
         );
       })}
-      <ul className="checks">
-        <li>
-          <Check />
-          <span>Funds stay in your wallet. Nothing is deposited or locked.</span>
-        </li>
-        <li>
-          <Check />
-          <span>The executor can pull only through suijin's Move rules, up to each budget.</span>
-        </li>
-        <li>
-          <Check />
-          <span>Ends {when(expiresAtMs)}. Pause or revoke any time in Portfolio.</span>
-        </li>
-      </ul>
+      <p className="small muted" style={{ margin: 0, lineHeight: 1.55 }}>
+        Funds stay in your wallet. The executor can pull only through suijin's Move rules, up to each budget, until {when(expiresAtMs)}. Pause
+        or revoke any time in Portfolio.
+      </p>
     </aside>
   );
 }
