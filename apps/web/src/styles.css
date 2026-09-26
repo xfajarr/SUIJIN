@@ -163,12 +163,12 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; 
 .route-item.best { border-color: rgba(43, 196, 180, 0.45); background: var(--accent-soft); }
 
 /* ---------- chips, meters, lists ---------- */
-.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: rgba(232, 251, 247, 0.07); color: var(--muted); white-space: nowrap; }
-.chip.accent { background: var(--accent-soft); color: var(--accent); }
-.chip.gold { background: var(--gold-soft); color: var(--gold); }
-.chip.danger { background: var(--danger-soft); color: var(--danger); }
-.dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-.dot.live { animation: pulse 1.8s ease-in-out infinite; }
+/* Tags are coloured text, not pills. */
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.chip.accent { color: var(--accent); }
+.chip.gold { color: var(--gold); }
+.chip.danger { color: var(--danger); }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .meter { height: 6px; border-radius: 999px; background: rgba(232, 251, 247, 0.08); overflow: hidden; }
 .meter > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), #6fe3d6); transition: width 0.8s var(--ease); }
 .meter.hot > span { background: linear-gradient(90deg, var(--gold), #ffd27a); }
@@ -276,7 +276,6 @@ mysten-dapp-kit-connect-button, mysten-dapp-kit-connect-modal {
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes pop { 0% { transform: scale(0.6); } 70% { transform: scale(1.08); } 100% { transform: scale(1); } }
 @keyframes draw { to { stroke-dashoffset: 0; } }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @keyframes toast-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
 @keyframes toast-out { to { opacity: 0; transform: translateX(24px); } }
 @keyframes flash { from { color: var(--gold); } }
