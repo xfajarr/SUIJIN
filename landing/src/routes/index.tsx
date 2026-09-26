@@ -4,6 +4,7 @@ import { initLanding } from '#/lib/landing'
 import Footer from '#/components/Footer'
 import Products from '#/components/Products'
 import Faq from '#/components/Faq'
+import Evolve from '#/components/Evolve'
 
 export const Route = createFileRoute('/')({ component: Landing })
 
@@ -246,6 +247,8 @@ function Landing() {
       <Faq />
 
       <Footer />
+
+      <Evolve />
     </>
   )
 }
