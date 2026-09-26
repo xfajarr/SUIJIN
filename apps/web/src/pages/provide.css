@@ -17,6 +17,10 @@
 .chip-btn:hover { background: var(--accent-soft); color: var(--accent); }
 .kv.receive { padding-top: 12px; border-top: 1px solid var(--line); font-size: 14px; }
 
+/* Limit: the order card, then the orders table below it */
+.limit-page { gap: 24px; }
+.orders { width: 100%; max-width: 880px; margin: 0 auto; }
+
 /* live preview beside the form (clears the sticky header) */
 .preview { position: sticky; top: 92px; }
 .preview-side { display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 13px; animation: rise 0.35s var(--ease) both; }
