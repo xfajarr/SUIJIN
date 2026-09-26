@@ -18,7 +18,7 @@
 .doc-table td:first-child { color: var(--ink); font-weight: 600; white-space: nowrap; }
 .doc-checks li::marker { color: var(--accent); font-weight: 700; }
 @media (max-width: 860px) {
-  .docs { grid-template-columns: 1fr; }
+  .docs { grid-template-columns: minmax(0, 1fr); gap: 20px; }
   .doc-toc { position: static; flex-direction: row; flex-wrap: wrap; }
   .doc-table td:first-child { white-space: normal; }
 }
