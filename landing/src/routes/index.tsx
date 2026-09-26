@@ -189,17 +189,6 @@ function Landing() {
             </div>
           </div>
         </div>
-        <aside className="ratio" aria-label="Example shared liquidity ratio">
-          <span>Shared liquidity ratio</span>
-          <strong>3.0×</strong>
-          <p>
-            1,000 SUI real
-            <br />
-            3,000 SUI quotable
-            <br />
-            across 3 strategies
-          </p>
-        </aside>
       </section>
 
       <div className="chip-flight" aria-label="Strategies one balance can serve">
