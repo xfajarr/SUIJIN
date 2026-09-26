@@ -1,5 +1,8 @@
 import { Transaction, type TransactionResult } from '@mysten/sui/transactions';
-import { DEPLOYMENT, typesOf, type Deployment } from './config';
+import { DEPLOYMENT, defaultPair, typesOf, type Deployment, type Pair } from './config';
+
+// Every builder returns an unsigned Transaction. `pair` defaults to the original market
+// (providers sell tJPY for tUSD); pass { base: tUSD, quote: tJPY } for the other side.
 
 type RateLimit = { periodMs: number; limit: bigint };
 
@@ -39,31 +42,58 @@ function propose(
   });
 }
 
-/** Maker: app-bound allowance over base inventory. Funds do not move. */
-export function issueMakerAllowance(
-  p: { cap: bigint; expiresAtMs: number; rateLimit?: RateLimit },
-  d: Deployment = DEPLOYMENT,
-): Transaction {
-  const tx = new Transaction();
-  const base = typesOf(d).base;
-  const proposal = propose(tx, d, base, 'suijin maker inventory', p.cap, p.expiresAtMs, p.rateLimit);
+export type AllowanceParams = { coin?: string; cap: bigint; expiresAtMs: number; rateLimit?: RateLimit };
+
+function addAllowance(tx: Transaction, d: Deployment, p: AllowanceParams) {
+  const coin = p.coin ?? typesOf(d).base;
+  const proposal = propose(tx, d, coin, 'suijin liquidity budget', p.cap, p.expiresAtMs, p.rateLimit);
   tx.moveCall({
     target: `${d.packageId}::app::issue_maker_allowance`,
-    typeArguments: [base],
+    typeArguments: [coin],
     arguments: [tx.object(d.configId), proposal],
   });
+}
+
+/** Provider: app-bound allowance (a "liquidity budget") over one coin, tJPY by default. Funds do not move. */
+export function issueMakerAllowance(p: AllowanceParams, d: Deployment = DEPLOYMENT): Transaction {
+  const tx = new Transaction();
+  addAllowance(tx, d, p);
   return tx;
 }
 
-export function createFixedStrategy(
-  p: { allowanceId: string; priceNum: bigint; priceDen: bigint; maxBasePerFill: bigint; virtualBaseLimit: bigint; expiresAtMs: number },
-  d: Deployment = DEPLOYMENT,
-): Transaction {
+/** Provider: several allowances in ONE transaction, e.g. both sides of a pair. */
+export function issueAllowances(list: AllowanceParams[], d: Deployment = DEPLOYMENT): Transaction {
   const tx = new Transaction();
-  const t = typesOf(d);
+  for (const p of list) addAllowance(tx, d, p);
+  return tx;
+}
+
+export type FixedParams = {
+  allowanceId: string;
+  priceNum: bigint;
+  priceDen: bigint;
+  maxBasePerFill: bigint;
+  virtualBaseLimit: bigint;
+  expiresAtMs: number;
+  pair?: Pair;
+};
+
+export type CurveParams = {
+  allowanceId: string;
+  virtualBase: bigint;
+  virtualQuote: bigint;
+  feeBps: bigint;
+  maxBasePerFill: bigint;
+  virtualBaseLimit: bigint;
+  expiresAtMs: number;
+  pair?: Pair;
+};
+
+function addFixed(tx: Transaction, d: Deployment, p: FixedParams) {
+  const pair = p.pair ?? defaultPair(d);
   tx.moveCall({
     target: `${d.packageId}::strategy::create_fixed`,
-    typeArguments: [t.base, t.quote],
+    typeArguments: [pair.base, pair.quote],
     arguments: [
       tx.object(p.allowanceId),
       tx.pure.u64(p.priceNum),
@@ -74,18 +104,13 @@ export function createFixedStrategy(
       tx.object.clock(),
     ],
   });
-  return tx;
 }
 
-export function createCurveStrategy(
-  p: { allowanceId: string; virtualBase: bigint; virtualQuote: bigint; feeBps: bigint; maxBasePerFill: bigint; virtualBaseLimit: bigint; expiresAtMs: number },
-  d: Deployment = DEPLOYMENT,
-): Transaction {
-  const tx = new Transaction();
-  const t = typesOf(d);
+function addCurve(tx: Transaction, d: Deployment, p: CurveParams) {
+  const pair = p.pair ?? defaultPair(d);
   tx.moveCall({
     target: `${d.packageId}::strategy::create_curve`,
-    typeArguments: [t.base, t.quote],
+    typeArguments: [pair.base, pair.quote],
     arguments: [
       tx.object(p.allowanceId),
       tx.pure.u64(p.virtualBase),
@@ -97,31 +122,54 @@ export function createCurveStrategy(
       tx.object.clock(),
     ],
   });
+}
+
+export function createFixedStrategy(p: FixedParams, d: Deployment = DEPLOYMENT): Transaction {
+  const tx = new Transaction();
+  addFixed(tx, d, p);
   return tx;
 }
 
-export function setStrategyActive(strategyId: string, active: boolean, d: Deployment = DEPLOYMENT): Transaction {
+export function createCurveStrategy(p: CurveParams, d: Deployment = DEPLOYMENT): Transaction {
   const tx = new Transaction();
-  const t = typesOf(d);
+  addCurve(tx, d, p);
+  return tx;
+}
+
+export type StrategySpec = ({ kind: 'fixed' } & FixedParams) | ({ kind: 'curve' } & CurveParams);
+
+/** Several strategies in ONE transaction, e.g. a two-sided liquidity position. */
+export function createStrategies(list: StrategySpec[], d: Deployment = DEPLOYMENT): Transaction {
+  const tx = new Transaction();
+  for (const s of list) {
+    if (s.kind === 'fixed') addFixed(tx, d, s);
+    else addCurve(tx, d, s);
+  }
+  return tx;
+}
+
+export function setStrategyActive(strategyId: string, active: boolean, pair?: Pair, d: Deployment = DEPLOYMENT): Transaction {
+  const tx = new Transaction();
+  const { base, quote } = pair ?? defaultPair(d);
   tx.moveCall({
     target: `${d.packageId}::strategy::set_active`,
-    typeArguments: [t.base, t.quote],
+    typeArguments: [base, quote],
     arguments: [tx.object(strategyId), tx.pure.bool(active)],
   });
   return tx;
 }
 
-/** Taker: exact-cap payment allowance + SwapOrder in ONE transaction. Funds do not move. */
+/** Trader: exact-cap payment allowance + SwapOrder in ONE transaction. Funds do not move. */
 export function createTakerOrder(
-  p: { strategyId: string; quoteIn: bigint; minBaseOut: bigint; quotedBaseOut: bigint; expiresAtMs: number; recipient: string },
+  p: { strategyId: string; quoteIn: bigint; minBaseOut: bigint; quotedBaseOut: bigint; expiresAtMs: number; recipient: string; pair?: Pair },
   d: Deployment = DEPLOYMENT,
 ): Transaction {
   const tx = new Transaction();
-  const t = typesOf(d);
-  const proposal = propose(tx, d, t.quote, 'suijin order payment', p.quoteIn, p.expiresAtMs);
+  const { base, quote } = p.pair ?? defaultPair(d);
+  const proposal = propose(tx, d, quote, 'suijin order payment', p.quoteIn, p.expiresAtMs);
   tx.moveCall({
     target: `${d.packageId}::order::create`,
-    typeArguments: [t.base, t.quote],
+    typeArguments: [base, quote],
     arguments: [
       tx.object(d.configId),
       proposal,
@@ -137,10 +185,10 @@ export function createTakerOrder(
   return tx;
 }
 
-export function cancelOrder(orderId: string, d: Deployment = DEPLOYMENT): Transaction {
+export function cancelOrder(orderId: string, pair?: Pair, d: Deployment = DEPLOYMENT): Transaction {
   const tx = new Transaction();
-  const t = typesOf(d);
-  tx.moveCall({ target: `${d.packageId}::order::cancel`, typeArguments: [t.base, t.quote], arguments: [tx.object(orderId)] });
+  const { base, quote } = pair ?? defaultPair(d);
+  tx.moveCall({ target: `${d.packageId}::order::cancel`, typeArguments: [base, quote], arguments: [tx.object(orderId)] });
   return tx;
 }
 
@@ -165,6 +213,20 @@ export function mintTestCoin(which: 'tusd' | 'tjpy', amount: bigint, d: Deployme
   return tx;
 }
 
+/** Mint both demo coins in ONE transaction. */
+export function mintTestCoins(amounts: { tusd?: bigint; tjpy?: bigint }, d: Deployment = DEPLOYMENT): Transaction {
+  const tx = new Transaction();
+  for (const which of ['tusd', 'tjpy'] as const) {
+    const amount = amounts[which];
+    if (!amount) continue;
+    tx.moveCall({
+      target: `${d.mockCoinsPackageId}::${which}::mint`,
+      arguments: [tx.object(which === 'tusd' ? d.tusdFaucetId : d.tjpyFaucetId), tx.pure.u64(amount)],
+    });
+  }
+  return tx;
+}
+
 export type FillParams = {
   strategyId: string;
   orderId: string;
@@ -174,24 +236,25 @@ export type FillParams = {
   takerAllowanceId: string;
   baseOut: bigint;
   quoteIn: bigint;
+  pair?: Pair;
 };
 
 /** Executor: one PTB that pulls both sides through their allowances and swaps them. */
 export function buildFill(p: FillParams, d: Deployment = DEPLOYMENT): Transaction {
   const tx = new Transaction();
-  const t = typesOf(d);
+  const { base, quote } = p.pair ?? defaultPair(d);
   tx.setSender(d.executor);
   tx.moveCall({
     target: `${d.packageId}::settlement::fill`,
-    typeArguments: [t.base, t.quote],
+    typeArguments: [base, quote],
     arguments: [
       tx.object(d.configId),
       tx.object(p.strategyId),
       tx.object(p.orderId),
       tx.object(p.makerAllowanceId),
-      tx.withdrawal({ amount: p.baseOut, type: t.base, from: 'allowance', allowance: p.makerAllowanceId, funder: p.maker }),
+      tx.withdrawal({ amount: p.baseOut, type: base, from: 'allowance', allowance: p.makerAllowanceId, funder: p.maker }),
       tx.object(p.takerAllowanceId),
-      tx.withdrawal({ amount: p.quoteIn, type: t.quote, from: 'allowance', allowance: p.takerAllowanceId, funder: p.taker }),
+      tx.withdrawal({ amount: p.quoteIn, type: quote, from: 'allowance', allowance: p.takerAllowanceId, funder: p.taker }),
       tx.object.clock(),
     ],
   });

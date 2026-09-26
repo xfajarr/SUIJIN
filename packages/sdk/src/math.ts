@@ -18,6 +18,24 @@ export function curveBaseOut(quoteIn: bigint, virtualBase: bigint, virtualQuote:
   return virtualBase - newBase;
 }
 
+const ceilDiv = (a: bigint, b: bigint) => (a + b - 1n) / b;
+
+/** Smallest quote_in whose fixed-rate output reaches `baseOut` (exact-output quotes). */
+export function fixedQuoteInFor(baseOut: bigint, priceNum: bigint, priceDen: bigint): bigint {
+  if (priceNum <= 0n || priceDen <= 0n) throw new Error('price must be positive');
+  return ceilDiv(baseOut * priceNum, priceDen);
+}
+
+/** Smallest quote_in whose curve output reaches `baseOut`; null when the curve cannot pay that much. */
+export function curveQuoteInFor(baseOut: bigint, virtualBase: bigint, virtualQuote: bigint, feeBps: bigint): bigint | null {
+  if (baseOut <= 0n) return 0n;
+  if (baseOut >= virtualBase) return null;
+  // ceil(k / (vq + eff)) <= vb - out  <=>  eff >= ceil(k / (vb - out)) - vq
+  const neededEffective = ceilDiv(virtualBase * virtualQuote, virtualBase - baseOut) - virtualQuote;
+  const quoteIn = ceilDiv(neededEffective * BPS, BPS - feeBps);
+  return curveBaseOut(quoteIn, virtualBase, virtualQuote, feeBps) >= baseOut ? quoteIn : quoteIn + 1n;
+}
+
 /** "1,500.25" style display for 6-decimal amounts. */
 export function formatUnits(value: bigint, decimals = 6, maxFraction = 2): string {
   const neg = value < 0n;

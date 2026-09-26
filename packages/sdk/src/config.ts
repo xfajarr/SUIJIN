@@ -28,3 +28,33 @@ export const typesOf = (d: Deployment = DEPLOYMENT) => ({
 
 /** Both demo coins use 6 decimals. */
 export const DECIMALS = 6;
+
+export type CoinKey = 'tJPY' | 'tUSD';
+export type CoinInfo = {
+  key: CoinKey;
+  type: string;
+  symbol: string;
+  name: string;
+  decimals: number;
+  faucet: 'tjpy' | 'tusd';
+  faucetId: string;
+};
+
+export const coinsOf = (d: Deployment = DEPLOYMENT): Record<CoinKey, CoinInfo> => ({
+  tJPY: { key: 'tJPY', type: `${d.mockCoinsPackageId}::tjpy::TJPY`, symbol: 'tJPY', name: 'Test Yen', decimals: 6, faucet: 'tjpy', faucetId: d.tjpyFaucetId },
+  tUSD: { key: 'tUSD', type: `${d.mockCoinsPackageId}::tusd::TUSD`, symbol: 'tUSD', name: 'Test Dollar', decimals: 6, faucet: 'tusd', faucetId: d.tusdFaucetId },
+});
+
+/** Pads every address in a Move type, so `0x2::sui::SUI` equals `0x000…002::sui::SUI`. */
+export const normalizeType = (t: string) =>
+  t.replace(/0x([0-9a-fA-F]+)/g, (_m, hex: string) => `0x${hex.toLowerCase().padStart(64, '0')}`);
+export const sameType = (a: string, b: string) => normalizeType(a) === normalizeType(b);
+export const coinByType = (type: string, d: Deployment = DEPLOYMENT) => Object.values(coinsOf(d)).find((c) => sameType(c.type, type));
+/** 'tJPY' / 'tUSD' or a full coin type. */
+export const resolveCoin = (keyOrType: string, d: Deployment = DEPLOYMENT): CoinInfo | undefined =>
+  coinsOf(d)[keyOrType as CoinKey] ?? coinByType(keyOrType, d);
+
+/** A market direction: providers sell `base` and receive `quote`. */
+export type Pair = { base: string; quote: string };
+/** The original market: providers sell tJPY for tUSD. */
+export const defaultPair = (d: Deployment = DEPLOYMENT): Pair => ({ base: typesOf(d).base, quote: typesOf(d).quote });
