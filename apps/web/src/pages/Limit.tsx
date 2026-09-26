@@ -5,6 +5,7 @@ import { COINS, keyOf, openConnect, other, useAction, useBalances, useNow, usePo
 import { AmountPanel, CoinIcon, Empty, FlipArrows, Meter, Segmented, Skeleton, Tabs, fmt, parseAmount, toInput, until } from '../ui';
 import { FlowPanel, PriceField, USD, pairFor, priceText, useMarketPrice, useProvideFlow } from './Earn';
 import { StatusChip, marketsOf, priceOf, type Market } from './Portfolio';
+import { TradeTabs } from './trade';
 import './provide.css';
 
 const HOUR = 3_600_000;
@@ -86,7 +87,7 @@ export function Limit() {
       <div className="center">
         <section className="card trade-card" aria-label="New limit order">
           <div className="card-head">
-            <h1 className="mode">Limit</h1>
+            <TradeTabs current="limit" />
             <span className="small muted">
               {market.loading ? <Skeleton w={110} h={12} /> : ref !== null ? `Market ${fmt(ref, 2)} tJPY` : 'No market yet'}
             </span>

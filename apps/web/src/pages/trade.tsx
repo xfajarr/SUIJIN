@@ -306,3 +306,26 @@ export const settledLine = (flow: OrderFlow) => {
     </span>
   );
 };
+
+const TRADE_TABS = [
+  { path: 'swap', label: 'Swap' },
+  { path: 'pay', label: 'Pay' },
+  { path: 'limit', label: 'Limit' },
+];
+
+/** Swap, Pay and Limit share one card: these tabs switch between them (each keeps its own URL). */
+export function TradeTabs({ current }: { current: 'swap' | 'pay' | 'limit' }) {
+  const label = TRADE_TABS.find((t) => t.path === current)!.label;
+  return (
+    <>
+      <h1 className="sr-only">{label}</h1>
+      <nav className="tabs" aria-label="Trade">
+        {TRADE_TABS.map((t) => (
+          <a key={t.path} className="tab" href={`#/${t.path}`} aria-current={t.path === current ? 'page' : undefined}>
+            {t.label}
+          </a>
+        ))}
+      </nav>
+    </>
+  );
+}

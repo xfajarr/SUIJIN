@@ -3,7 +3,7 @@ import { mintTestCoins, type CoinKey } from '@suijin/sdk';
 import { useState } from 'react';
 import { openConnect, other, useAction, useBalances, useQuotes } from '../chain';
 import { AmountPanel, FlipArrows, fmt, parseAmount, toInput } from '../ui';
-import { FlowProgress, QuoteDetails, RateLine, Receipt, RefreshRing, SlippageSettings, Sliders, settledLine, useOrderFlow } from './trade';
+import { FlowProgress, QuoteDetails, RateLine, Receipt, RefreshRing, SlippageSettings, Sliders, TradeTabs, settledLine, useOrderFlow } from './trade';
 
 const REFRESH_MS = 15_000;
 
@@ -75,7 +75,7 @@ export function Swap() {
     <div className="center page">
       <section className="card trade-card" aria-busy={live.loading}>
         <div className="card-head">
-          <h1 className="mode">Swap</h1>
+          <TradeTabs current="swap" />
           <div className="inline">
             {quote && idle && <RefreshRing updatedAt={live.updatedAt} ms={REFRESH_MS} onClick={live.refresh} />}
             <button
