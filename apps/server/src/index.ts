@@ -40,7 +40,8 @@ type QuoteRequest = { buy: string; sell: string; slippageBps?: bigint } & ({ quo
 async function quotes(req: QuoteRequest) {
   // GraphQL finds the strategies; their state is then re-read from the fullnode, because a quote
   // priced on a lagging index can fail at settlement.
-  const listed = (await listStrategies()).filter((s) => sameType(s.baseType, req.buy) && sameType(s.quoteType, req.sell));
+  const now = BigInt(Date.now());
+  const listed = (await listStrategies()).filter((s) => s.expiryMs > now && sameType(s.baseType, req.buy) && sameType(s.quoteType, req.sell));
   const strategies = await freshStrategies(client, listed.map((s) => s.id));
   const holders = [...new Map(strategies.map((s) => [balanceKey(s.maker, s.baseType), s] as const)).values()];
   const [balances, allowances] = await Promise.all([
@@ -73,7 +74,8 @@ function parseQuoteRequest(body: Record<string, unknown>): QuoteRequest | string
 const server = Bun.serve({
   port: Number(process.env.PORT ?? 8790),
   routes: {
-    '/v1/health': () => json({ ok: true, network: DEPLOYMENT.network, executor: DEPLOYMENT.executor }),
+    // api 2: quotes in either direction, exact input or output. The web app checks it.
+    '/v1/health': () => json({ ok: true, network: DEPLOYMENT.network, executor: DEPLOYMENT.executor, api: 2 }),
     '/v1/strategies': { GET: async () => json(await listStrategies()), OPTIONS: preflight },
     '/v1/quote': {
       OPTIONS: preflight,
