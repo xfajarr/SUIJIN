@@ -388,21 +388,7 @@ export function Earn() {
               </Step>
 
               <Step n={2} title="Price">
-                <Segmented
-                  label="Shape"
-                  full
-                  value={shape}
-                  onChange={setShape}
-                  options={SHAPES.map((o) => ({
-                    value: o.value,
-                    label: (
-                      <span className="shape-opt">
-                        {o.icon}
-                        {o.title}
-                      </span>
-                    ),
-                  }))}
-                />
+                <Options label="Price shape" value={shape} options={SHAPES} onChange={setShape} />
                 <PriceStepper price={price} onChange={setPrice} mid={market.mid} loading={market.loading} sides={sides} />
                 <div className="knob">
                   <span>Your fee on each fill</span>
