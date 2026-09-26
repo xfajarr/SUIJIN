@@ -88,7 +88,7 @@ const Guide = () => (
 
     <Section id="swap" title="Swap">
       <p>
-        Trade one coin for another. Suijin checks every market and shows the best price. You approve <b>exactly</b> the amount you pay, and
+        Trade any token for any other: tUSD, tJPY, SUI, USDC, DEEP, or any Sui coin you add by pasting its type. Suijin checks every market and shows the best price. You approve <b>exactly</b> the amount you pay, and
         that approval expires after five minutes. If the price moves more than your slippage setting, the trade does not happen and nothing
         leaves your wallet. A red button means the trade would move the price a lot: check before you continue.
       </p>
@@ -211,6 +211,7 @@ const Technical = () => (
           <tr><td>PTBs</td><td>One fill = one PTB with two Allowance withdrawals. Two budgets or two markets are created in one PTB.</td></tr>
           <tr><td>Shared objects</td><td><code>Strategy</code>, <code>SwapOrder</code> and Allowances are shared, so the executor can settle any of them.</td></tr>
           <tr><td>Coin Registry</td><td>tUSD and tJPY use <code>coin_registry::new_currency_with_otw</code>; <code>finalize_registration</code> publishes their metadata (6 decimals).</td></tr>
+          <tr><td>Any coin</td><td>Every Move entry point is generic over <code>&lt;Base, Quote&gt;</code>, so any Sui coin can be listed without a new deployment. The app keeps a token registry (symbol, decimals, logo from on-chain metadata) and converts prices across decimals, e.g. SUI (9) against USDC (6).</td></tr>
           <tr><td>gRPC + GraphQL</td><td>GraphQL for discovery and history (paginated). gRPC fullnode reads for anything that prices or settles, so quotes match what Move recomputes.</td></tr>
         </tbody>
       </table>
@@ -332,6 +333,7 @@ price impact:        ideal = quote_in × (1 − fee) × vb / vq,  impact = (idea
         <li>One executor today; it can delay orders but not steal.</li>
         <li>Prices are set by providers; there is no oracle yet.</li>
         <li>The shared-liquidity ratio is availability, not TVL: not every market on a budget can fill at once.</li>
+        <li>Allowances spend from address balances. Tokens held as Coin objects need one "Move to balance" transaction first (they stay in the wallet).</li>
         <li>Sui Allowances are live on testnet and devnet only. Unaudited hackathon code.</li>
       </ul>
     </Section>

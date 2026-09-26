@@ -38,7 +38,7 @@ On top of that primitive the web app ships four products:
 
 | Feature | What the user does | What happens underneath |
 |---|---|---|
-| **Swap** | Trade tUSD ⇄ tJPY, typing the amount in or the amount out | The trader signs an exact-cap payment Allowance + order; the executor settles both sides in one PTB |
+| **Swap** | Trade any two tokens (tUSD, tJPY, SUI, USDC, DEEP, or any coin added by type), typing the amount in or the amount out | The trader signs an exact-cap payment Allowance + order; the executor settles both sides in one PTB |
 | **Pay** | Send someone an exact amount in the coin they want, or share a payment link | Exact-output quote; the order's recipient is the merchant, who gets at least the target |
 | **Earn** | Provide liquidity from a wallet: curve or fixed price, fee tier, depth, one or two sides | Budgets are Allowances; one budget can back many markets, nothing is deposited |
 | **Limit** | Sell at a chosen price, cancel any time | A fixed-price market on its own budget; cancel = revoke the Allowance |
