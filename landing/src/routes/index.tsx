@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { initLanding } from '#/lib/landing'
 import Footer from '#/components/Footer'
 import Products from '#/components/Products'
+import Faq from '#/components/Faq'
 
 export const Route = createFileRoute('/')({ component: Landing })
 
@@ -241,6 +242,8 @@ function Landing() {
       </section>
 
       <Products />
+
+      <Faq />
 
       <Footer />
     </>
