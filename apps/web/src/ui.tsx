@@ -38,6 +38,40 @@ export function Segmented<T extends string | number>(p: {
   );
 }
 
+/** In-card tabs (the selected one is a tinted pill). */
+export function Tabs<T extends string>(p: { label: string; value: T; onChange: (v: T) => void; tabs: { value: T; label: ReactNode; count?: number }[] }) {
+  return (
+    <div className="tabs" role="tablist" aria-label={p.label}>
+      {p.tabs.map((t) => (
+        <button key={t.value} type="button" role="tab" className="tab" aria-selected={t.value === p.value} onClick={() => p.onChange(t.value)}>
+          {t.label}
+          {t.count !== undefined && <span className="count">{t.count}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Selectable cards with a title and a caption: a radio group that explains each choice. */
+export function Options<T extends string | number>(p: {
+  label: string;
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; title: ReactNode; caption?: ReactNode; icon?: ReactNode }[];
+}) {
+  return (
+    <div className="options" role="radiogroup" aria-label={p.label} style={{ gridTemplateColumns: `repeat(${p.options.length}, minmax(0, 1fr))` }}>
+      {p.options.map((o) => (
+        <button key={String(o.value)} type="button" role="radio" className="option" aria-checked={o.value === p.value} onClick={() => p.onChange(o.value)}>
+          {o.icon}
+          <b>{o.title}</b>
+          {o.caption && <span>{o.caption}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** 0..1 progress bar. `hot` = gold, for "almost used up". */
 export function Meter({ value, hot, label }: { value: number; hot?: boolean; label: string }) {
   const v = Math.round(Math.max(0, Math.min(1, value)) * 100);
