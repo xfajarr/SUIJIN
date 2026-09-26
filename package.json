@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p apps/web/tsconfig.json",
     "deploy": "bun scripts/deploy.ts testnet",
     "e2e": "bun scripts/e2e.ts",
+    "smoke": "bun scripts/smoke-server.ts",
     "server": "bun apps/server/src/index.ts",
     "web": "cd apps/web && bunx vite"
   },
