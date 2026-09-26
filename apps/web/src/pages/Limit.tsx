@@ -1,11 +1,11 @@
 import { useCurrentAccount } from '@mysten/dapp-kit-react';
-import { revokeAllowance, setStrategyActive, type CoinKey } from '@suijin/sdk';
+import { convertAt, fixedPriceFor, revokeAllowance, setStrategyActive, type CoinKey } from '@suijin/sdk';
 import { useEffect, useState } from 'react';
-import { COINS, keyOf, openConnect, other, useAction, useBalances, useNow, usePositions } from '../chain';
-import { AmountPanel, CoinIcon, Empty, FlipArrows, Meter, Segmented, Skeleton, Tabs, fmt, parseAmount, toInput, until } from '../ui';
-import { FlowPanel, PriceField, USD, pairFor, priceText, useMarketPrice, useProvideFlow } from './Earn';
-import { StatusChip, marketsOf, priceOf, type Market } from './Portfolio';
-import { TradeTabs } from './trade';
+import { coin, keyOf, openConnect, useAction, useBalances, useNow, usePositions } from '../chain';
+import { AmountPanel, CoinIcon, Empty, FlipArrows, Meter, Segmented, Skeleton, Tabs, fmtAmt, fmtPrice, parseAmount, parsePrice, priceText, toInput, until } from '../ui';
+import { FlowPanel, PriceField, decimalsOf, orientKeys, pairFor, useMarketPrice, useProvideFlow } from './Earn';
+import { StatusChip, marketsOf, strategyPrice, type Market } from './Portfolio';
+import { BalanceHint, TradeTabs } from './trade';
 import './provide.css';
 
 const HOUR = 3_600_000;
@@ -26,35 +26,45 @@ export function Limit() {
   const account = useCurrentAccount();
   const balances = useBalances();
   const positions = usePositions();
-  const market = useMarketPrice();
   const now = useNow(15_000);
   const flow = useProvideFlow();
   const [sell, setSell] = useState<CoinKey>('tJPY');
+  const [buy, setBuy] = useState<CoinKey>('tUSD');
   const [text, setText] = useState('');
   const [price, setPrice] = useState<string | null>(null);
   const [hours, setHours] = useState(24);
   const [turns, setTurns] = useState(0);
 
-  // The order competes with this side of the market: a trader buying tJPY gets `jpyOut` per tUSD,
-  // a trader buying tUSD pays `jpyIn` per tUSD.
-  const ref = sell === 'tJPY' ? market.jpyOut : market.jpyIn;
+  // The price reads "1 unit = P priced" whichever side is sold.
+  const { unit, priced } = orientKeys(sell, buy);
+  const sellsPriced = sell === priced;
+  const dec = decimalsOf(unit, priced);
+  const market = useMarketPrice(unit, priced);
+  // The order competes with this side of the market: a trader buying `priced` gets `pricedOut` per
+  // unit, a trader buying `unit` pays `pricedIn` per unit.
+  const ref = sellsPriced ? market.pricedOut : market.pricedIn;
   useEffect(() => {
-    if (price === null && !market.loading) setPrice(priceText(ref ?? 150_000_000n));
-  }, [price, market.loading, ref]);
+    if (price !== null || market.loading) return;
+    const start = ref ?? (unit === 'tUSD' && priced === 'tJPY' ? 150_000_000n : null);
+    setPrice(start === null ? '' : priceText(start));
+  }, [price, market.loading, ref, unit, priced]);
 
-  const buy = other(sell);
-  const amount = parseAmount(text);
-  const P = parseAmount(price ?? '');
-  const balance = balances.value?.[sell];
-  const receive = amount !== null && P !== null && P > 0n ? (sell === 'tJPY' ? (amount * USD) / P : (amount * P) / USD) : null;
-  // The seller's edge over the market: selling tJPY wants fewer tJPY per tUSD, selling tUSD wants more.
-  const edge = P !== null && P > 0n && ref !== null ? (sell === 'tJPY' ? Number(ref) / Number(P) : Number(P) / Number(ref)) - 1 : null;
-  const priceAt = (e: number) => ref !== null && setPrice(priceText(sell === 'tJPY' ? scale(ref, 1 / (1 + e)) : scale(ref, 1 + e)));
+  const amount = parseAmount(text, coin(sell).decimals);
+  const P = parsePrice(price ?? '');
+  const balance = balances.value?.address[sell];
+  const receive = amount !== null && P !== null && P > 0n ? convertAt({ ...dec, price: P, amount, from: sellsPriced ? 'priced' : 'unit' }) : null;
+  // The seller's edge over the market: selling priced wants fewer priced per unit, selling unit wants more.
+  const edge = P !== null && P > 0n && ref !== null ? (sellsPriced ? Number(ref) / Number(P) : Number(P) / Number(ref)) - 1 : null;
+  const priceAt = (e: number) => ref !== null && setPrice(priceText(sellsPriced ? scale(ref, 1 / (1 + e)) : scale(ref, 1 + e)));
   const flip = () => {
     setSell(buy);
+    setBuy(sell);
     setPrice(null);
     setTurns((t) => t + 1);
   };
+  // Picking the token already on the other side swaps the two; a new pair re-reads the market.
+  const pickSell = (k: CoinKey) => (k === buy ? flip() : (setSell(k), setPrice(null)));
+  const pickBuy = (k: CoinKey) => (k === sell ? flip() : (setBuy(k), setPrice(null)));
 
   const problem =
     amount === null || amount <= 0n ? 'Enter an amount' : P === null || P <= 0n ? 'Enter a price' : !receive ? 'Amount too small for this price' : null;
@@ -69,13 +79,12 @@ export function Limit() {
         {
           kind: 'fixed',
           allowanceId: ids[sell] ?? '',
-          // sell tJPY: 1 tUSD buys P tJPY. sell tUSD: P tJPY buys 1 tUSD.
-          priceNum: sell === 'tJPY' ? USD : P,
-          priceDen: sell === 'tJPY' ? P : USD,
+          // Exactly the limit price, no spread: selling priced, 1 unit buys P; selling unit, P buys 1 unit.
+          ...fixedPriceFor({ ...dec, sell: sellsPriced ? 'priced' : 'unit', price: P, feeBps: 0n }),
           maxBasePerFill: amount,
           virtualBaseLimit: amount,
           expiresAtMs: exp,
-          pair: pairFor(sell),
+          pair: pairFor(sell, buy),
         },
       ],
       done: 'Limit order placed',
@@ -89,17 +98,17 @@ export function Limit() {
           <div className="card-head">
             <TradeTabs current="limit" />
             <span className="small muted">
-              {market.loading ? <Skeleton w={110} h={12} /> : ref !== null ? `Market ${fmt(ref, 2)} tJPY` : 'No market yet'}
+              {market.loading ? <Skeleton w={110} h={12} /> : ref !== null ? `Market ${fmtPrice(ref)} ${priced}` : 'No market yet'}
             </span>
           </div>
           {flow.stage !== 'idle' ? (
             <FlowPanel
               flow={flow}
-              grant={{ title: 'Approve budget', detail: `Capped at ${amount ? fmt(amount) : '0'} ${sell}. Nothing moves.` }}
-              open={{ title: 'Place order', detail: `Sell at 1 tUSD = ${price ?? '—'} tJPY.` }}
+              grant={{ title: 'Approve budget', detail: `Capped at ${amount ? fmtAmt(amount, sell) : '0'} ${sell}. Nothing moves.` }}
+              open={{ title: 'Place order', detail: `Sell at 1 ${unit} = ${price ?? '—'} ${priced}.` }}
               success={{
                 title: 'Limit order placed',
-                body: `It fills when it is the best route for a trader. You receive up to ${receive !== null ? fmt(receive) : '0'} ${buy}.`,
+                body: `It fills when it is the best route for a trader. You receive up to ${receive !== null ? fmtAmt(receive, buy) : '0'} ${buy}.`,
               }}
               again="Place another"
             />
@@ -111,9 +120,11 @@ export function Limit() {
                   coin={sell}
                   value={text}
                   onChange={setText}
-                  onCoin={flip}
+                  onPick={pickSell}
+                  exclude={buy}
+                  balances={balances.value?.address}
                   balance={account ? (balance ?? null) : undefined}
-                  onMax={balance !== undefined ? () => setText(toInput(balance)) : undefined}
+                  onMax={balance !== undefined ? () => setText(toInput(balance, coin(sell).decimals)) : undefined}
                   invalid={text !== '' && (amount === null || amount <= 0n)}
                   autoFocus
                 />
@@ -122,15 +133,25 @@ export function Limit() {
                     <FlipArrows />
                   </button>
                 </div>
-                <AmountPanel label="Receive if fully filled" coin={buy} value={receive !== null ? fmt(receive) : ''} outline />
+                <AmountPanel
+                  label="Receive if fully filled"
+                  coin={buy}
+                  value={receive !== null ? fmtAmt(receive, buy) : ''}
+                  onPick={pickBuy}
+                  exclude={sell}
+                  balances={balances.value?.address}
+                  outline
+                />
               </div>
               {amount !== null && balance !== undefined && amount > balance && (
                 <span className="hint warn">
-                  Your wallet holds {fmt(balance)} {sell}: the order fills up to that.
+                  Your wallet holds {fmtAmt(balance, sell)} {sell}: the order fills up to that.
                 </span>
               )}
               <PriceField
                 label="Limit price"
+                unit={unit}
+                priced={priced}
                 value={price}
                 onChange={setPrice}
                 invalid={price !== null && price !== '' && (P === null || P <= 0n)}
@@ -162,6 +183,7 @@ export function Limit() {
               <button type="button" className="cta" disabled={!!account && !!problem} onClick={account ? submit : openConnect}>
                 {!account ? 'Connect wallet' : (problem ?? 'Place limit order')}
               </button>
+              <BalanceHint coin={sell} balances={balances.value} me={account?.address ?? ''} />
             </>
           )}
         </section>
@@ -256,6 +278,7 @@ function OrderRow({ o, now, actions }: { o: Market; now: number; actions: Return
   const cancelKey = `cancel:${s.id}`;
   // Cancel = revoke the order's own budget. A budget that also backs other markets is paused instead.
   const own = budget && budget.markets.length === 1 ? budget : null;
+  const px = strategyPrice(s);
   return (
     <tr>
       <td>
@@ -263,15 +286,17 @@ function OrderRow({ o, now, actions }: { o: Market; now: number; actions: Return
           <CoinIcon coin={base} size={26} />
           <span>
             <b>
-              Sell {fmt(total)} {base}
+              Sell {fmtAmt(total, base)} {base}
             </b>
             <span className="sub">for {quote}</span>
           </span>
         </span>
       </td>
       <td>
-        {fmt(priceOf(s), 2)}
-        <span className="sub">tJPY per tUSD</span>
+        {fmtPrice(px.price)}
+        <span className="sub">
+          {px.priced} per {px.unit}
+        </span>
       </td>
       <td>
         <div style={{ width: 96 }}>
@@ -280,7 +305,7 @@ function OrderRow({ o, now, actions }: { o: Market; now: number; actions: Return
         <span className="sub">{Math.round(filled * 100)}%</span>
       </td>
       <td className="r">
-        <span className="gold">{fmt(s.quoteReceived)}</span> {quote}
+        <span className="gold">{fmtAmt(s.quoteReceived, quote)}</span> {quote}
       </td>
       <td>
         <StatusChip status={status} order />
@@ -308,7 +333,7 @@ function OrderRow({ o, now, actions }: { o: Market; now: number; actions: Return
                 className="act danger"
                 disabled={!!busy}
                 onClick={() =>
-                  act('Cancelling order', () => revokeAllowance({ coin: COINS[own.coin].type, allowanceId: own.allowance.id, capId: own.capId }), {
+                  act('Cancelling order', () => revokeAllowance({ coin: coin(own.coin).type, allowanceId: own.allowance.id, capId: own.capId }), {
                     done: 'Order cancelled',
                     key: cancelKey,
                   })
