@@ -1,0 +1,9 @@
+{
+  "network": "testnet",
+  "packageId": "0x0",
+  "configId": "0x0",
+  "executor": "0x0",
+  "mockCoinsPackageId": "0x0",
+  "tusdFaucetId": "0x0",
+  "tjpyFaucetId": "0x0"
+}
