@@ -1,9 +1,9 @@
 {
   "network": "testnet",
-  "packageId": "0x0",
-  "configId": "0x0",
-  "executor": "0x0",
-  "mockCoinsPackageId": "0x0",
-  "tusdFaucetId": "0x0",
-  "tjpyFaucetId": "0x0"
+  "packageId": "0x9d82a68d5c4bbc3630bc9a02953970f4a435edab056f5126af64f59796c0b502",
+  "configId": "0x87b126f7464d89a494ea1c61eba8ae4180fcd144e846ab45dd8dc86edf43e494",
+  "executor": "0x13478f81bc94b611fc8d26f29dff4eba7449a175bf7cf193c9d90bf4970ff8a6",
+  "mockCoinsPackageId": "0xc3bbdde31c8bba5c5ae568de8aad7edf2e4be4f0023e5fc5a4da3d1e8e5d2ec4",
+  "tusdFaucetId": "0xcf668b5b489e7c2d50ed09cf1419aeef80e35975a21bd15a8d462869b295f359",
+  "tjpyFaucetId": "0x7c0dbf7cb90f5216117ab875c7bf3c788f35079aad3f1645e6a6949fffa547ee"
 }
