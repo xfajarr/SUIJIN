@@ -273,7 +273,7 @@ export function Portfolio() {
           </div>
         </div>
         <div className="pf-group">
-          <h2>Liquidity</h2>
+          <h2>Positions</h2>
           <div className="pf-metrics">
             <Metric label="Live budgets">{p ? budgets.filter((b) => isLive(b, now)).length : loading}</Metric>
             <Metric label="Open markets">{p ? open.length : loading}</Metric>
