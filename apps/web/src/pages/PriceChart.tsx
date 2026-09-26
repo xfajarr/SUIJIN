@@ -8,7 +8,7 @@ import { useId, useState } from 'react';
 type Props = {
   coin: CoinKey; // what the provider sells
   amount: number; // budget, in whole coins
-  mid: number; // entered price, tJPY per tUSD
+  mid: number; // the provider's entered price, tJPY per tUSD (the dashed line)
   fee: number; // 0.003 = 0.30%
   shape: 'fixed' | 'curve';
   depth: number; // virtual pool = amount × depth
@@ -86,7 +86,7 @@ export function PriceChart(p: Props) {
         </svg>
         <span className="pchart-dot" style={{ left: `${f * 100}%`, top: `${(y(priceNow) / H) * 100}%` }} />
         <span className="pchart-reflabel" style={{ top: `${(midY / H) * 100}%` }}>
-          market {nf(p.mid)}
+          your price {nf(p.mid)}
         </span>
       </div>
       <div className="spread small pchart-axis">

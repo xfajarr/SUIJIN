@@ -58,7 +58,7 @@
 .range-track { height: 6px; border-radius: 999px; background: linear-gradient(90deg, var(--accent), var(--gold)); }
 .range-track.open { background: linear-gradient(90deg, var(--accent), rgba(244, 182, 60, 0.3) 75%, transparent); }
 .card.form { gap: 18px; }
-.side-label { display: inline-flex; align-items: center; gap: 6px; }
+.side-label { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .coin-pair { display: inline-flex; }
 .coin-pair .coin + .coin { margin-left: -5px; box-shadow: 0 0 0 1.5px #0b1d1a; }
 
