@@ -1,8 +1,8 @@
 import { useCurrentClient } from '@mysten/dapp-kit-react';
-import { createTakerOrder, type CoinKey, type Quote } from '@suijin/sdk';
+import { createTakerOrder, depositToBalance, mintTestCoins, type CoinKey, type Quote } from '@suijin/sdk';
 import { useState, type CSSProperties, type ReactNode } from 'react';
-import { explorer, friendlyError, keyOf, refreshAll, requestFill, toast, useRun } from '../chain';
-import { Check, Chevron, Segmented, Skeleton, Steps, TxLink, fmt, fmtCoin, pct, rate, short, type StepState } from '../ui';
+import { coin, explorer, friendlyError, keyOf, refreshAll, requestFill, toast, useAction, useRun, type Balances } from '../chain';
+import { Check, Chevron, Segmented, Skeleton, Steps, TxLink, fmtAmt, fmtCoin, pct, rateOf, short, type StepState } from '../ui';
 
 // The trader side, shared by Swap and Pay: sign one order, then the executor settles it.
 
@@ -185,7 +185,7 @@ export function RateLine({ quote, sell, buy, loading }: { quote: Quote | null; s
   const [inverted, setInverted] = useState(false);
   if (loading) return <Skeleton w={170} h={14} />;
   if (!quote) return <span className="faint small">No price yet</span>;
-  const text = inverted ? `1 ${buy} = ${rate(quote.quoteIn, quote.baseOut)} ${sell}` : `1 ${sell} = ${rate(quote.baseOut, quote.quoteIn)} ${buy}`;
+  const text = inverted ? `1 ${buy} = ${rateOf(quote.quoteIn, sell, quote.baseOut, buy)} ${sell}` : `1 ${sell} = ${rateOf(quote.baseOut, buy, quote.quoteIn, sell)} ${buy}`;
   return (
     <button type="button" className="rate-line" onClick={() => setInverted((v) => !v)} title="Invert price">
       {text}
@@ -230,7 +230,7 @@ export function QuoteDetails(p: {
           <div className="kv">
             <span>You pay (exact)</span>
             <span>
-              {fmt(q.quoteIn, 6)} {p.sell}
+              {fmtAmt(q.quoteIn, p.sell, 6)} {p.sell}
             </span>
           </div>
           <div className="kv">
@@ -240,7 +240,7 @@ export function QuoteDetails(p: {
           <div className="kv">
             <span>Minimum received</span>
             <span>
-              {fmt(q.minBaseOut, 6)} {p.buy}
+              {fmtAmt(q.minBaseOut, p.buy, 6)} {p.buy}
             </span>
           </div>
           <div className="kv">
@@ -302,7 +302,7 @@ export const settledLine = (flow: OrderFlow) => {
   const q = flow.quote!;
   return (
     <span className="num">
-      {fmt(flow.paid ?? q.quoteIn)} {keyOf(q.quoteType)} → <b className="gold">{fmt(flow.received ?? q.baseOut)}</b> {keyOf(q.baseType)}
+      {fmtAmt(flow.paid ?? q.quoteIn, keyOf(q.quoteType))} {keyOf(q.quoteType)} → <b className="gold">{fmtAmt(flow.received ?? q.baseOut, keyOf(q.baseType))}</b> {keyOf(q.baseType)}
     </span>
   );
 };
@@ -328,4 +328,48 @@ export function TradeTabs({ current }: { current: 'swap' | 'pay' | 'limit' }) {
       </nav>
     </>
   );
+}
+
+/** SUI kept out of the balance so the wallet can still pay gas. */
+const GAS_RESERVE = 100_000_000n;
+
+/**
+ * Under an amount panel: offers to move a token held as Coin objects into the address balance
+ * (the only place allowances spend from), or test tokens for an empty demo coin.
+ */
+export function BalanceHint({ coin: key, balances, me }: { coin: CoinKey; balances: Balances | null | undefined; me: string }) {
+  const { act, busy } = useAction();
+  if (!me || !balances) return null;
+  const info = coin(key);
+  const inCoins = balances.coins[key] ?? 0n;
+  const movable = info.type === '0x2::sui::SUI' ? inCoins - GAS_RESERVE : inCoins;
+  if (movable > 0n)
+    return (
+      <button
+        type="button"
+        className="link-btn"
+        style={{ alignSelf: 'center' }}
+        disabled={!!busy}
+        onClick={() =>
+          act(`Moving ${fmtCoin(movable, key)} to your balance`, () => depositToBalance({ coinType: info.type, amount: movable, owner: me }), {
+            done: `${fmtCoin(movable, key)} ready to trade`,
+          })
+        }
+      >
+        {busy ? 'Moving…' : `Move ${fmtCoin(movable, key)} to your balance to trade it`}
+      </button>
+    );
+  if (info.faucet && (balances.address[key] ?? 0n) === 0n)
+    return (
+      <button
+        type="button"
+        className="link-btn"
+        style={{ alignSelf: 'center' }}
+        disabled={!!busy}
+        onClick={() => act('Minting test tokens', () => mintTestCoins({ tusd: 1_000_000_000n, tjpy: 150_000_000_000n }), { done: 'Added 1,000 tUSD and 150,000 tJPY' })}
+      >
+        {busy ? 'Minting…' : `No ${key} yet? Get test tokens`}
+      </button>
+    );
+  return null;
 }

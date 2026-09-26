@@ -125,7 +125,7 @@ function Faucet() {
   const balances = useBalances();
   const { act, busy } = useAction();
   if (!account) return null;
-  if (balances.value?.sui === 0n) {
+  if (balances.value?.gas === 0n) {
     return (
       <a className="tool" href={`https://faucet.sui.io/?address=${account.address}`} target="_blank" rel="noreferrer" title="Get testnet SUI for gas">
         <Drop />
