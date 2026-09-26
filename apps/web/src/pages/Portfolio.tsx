@@ -1,9 +1,10 @@
 import { useCurrentAccount } from '@mysten/dapp-kit-react';
 import { BPS, DEPLOYMENT, listFills, revokeAllowance, setStrategyActive, type FillEvent, type StrategyState } from '@suijin/sdk';
 import { useState, type ReactNode } from 'react';
-import { COINS, keyOf, openConnect, useAction, useBalances, useNow, usePoll, usePositions, type Approval, type Budget } from '../chain';
-import { Addr, CoinIcon, Empty, Meter, Skeleton, TxLink, ago, fmt, pct, until } from '../ui';
-import './provide.css';
+import { COINS, COIN_KEYS, keyOf, openConnect, useAction, useBalances, useNow, usePoll, usePositions, type Approval, type Budget } from '../chain';
+import { Addr, CoinIcon, Empty, Meter, Skeleton, Tabs, TxLink, ago, fmt, pct, until } from '../ui';
+import './portfolio.css';
+import './provide.css'; // MarketRow (still used by Limit) styles its actions there
 
 // Position math and rows shared with Earn and Limit live here, next to the page that lists them all.
 
@@ -43,7 +44,7 @@ export function StatusChip({ status, order }: { status: MarketStatus; order?: bo
   const s = STATUS[status];
   return (
     <span className={`chip ${s.tone}`}>
-      <span className={`dot${status === 'open' ? ' live' : ''}`} />
+      <span className="dot" />
       {order && status === 'closed' ? 'Cancelled' : s.label}
     </span>
   );
@@ -168,26 +169,25 @@ export function MarketRow({ s, budget, status, now, actions, order }: Market & {
   );
 }
 
-/** First `n` items, with a Show all / Show fewer toggle when there are more. */
-function useClamp<T>(items: T[], n = 6) {
+// ---------- page ----------
+
+type Tab = 'markets' | 'budgets' | 'activity' | 'approvals';
+
+/** First `n` rows, with a Show all / Show fewer toggle when there are more. */
+function useClamp<T>(items: T[], n: number) {
   const [all, setAll] = useState(false);
   return {
     shown: all ? items : items.slice(0, n),
     toggle:
       items.length > n ? (
-        <button type="button" className="btn ghost sm more" onClick={() => setAll(!all)}>
+        <button type="button" className="act pf-more" onClick={() => setAll(!all)}>
           {all ? 'Show fewer' : `Show all ${items.length}`}
         </button>
       ) : null,
   };
 }
 
-const Stat = ({ label, children }: { label: string; children: ReactNode }) => (
-  <div className="stat">
-    <span>{label}</span>
-    <span className="inline">{children}</span>
-  </div>
-);
+const isLive = (b: Budget, now: number) => Number(b.allowance.expirationMs ?? 0n) > now && b.remaining !== 0n;
 
 export function Portfolio() {
   const account = useCurrentAccount();
@@ -197,16 +197,17 @@ export function Portfolio() {
   const fills = usePoll(() => listFills(DEPLOYMENT, 50), [], 10_000);
   const now = useNow(15_000);
   const actions = useAction();
+  const [tab, setTab] = useState<Tab>('markets');
 
   const p = positions.value;
   const bal = balances.value;
   const markets = p ? marketsOf(p.strategies, p.budgets, now) : [];
-  const expired = (b: Budget) => Number(Number(b.allowance.expirationMs ?? 0n) <= now);
-  const budgets = p ? [...p.budgets].sort((a, b) => expired(a) - expired(b)) : [];
+  const budgets = p ? [...p.budgets].sort((a, b) => Number(isLive(b, now)) - Number(isLive(a, now))) : [];
+  const approvals = p?.approvals ?? [];
   const mine = (fills.value ?? []).filter((f) => [f.maker, f.taker, f.recipient].some((a) => a.toLowerCase() === me));
-  const budgetList = useClamp(budgets, 5);
-  const marketList = useClamp(markets, 6);
-  const activity = useClamp(mine, 8);
+  const marketRows = useClamp(markets, 8);
+  const budgetRows = useClamp(budgets, 8);
+  const activityRows = useClamp(mine, 10);
 
   const head = (
     <div className="page-head">
@@ -240,162 +241,287 @@ export function Portfolio() {
   const avgRatio = ratios.length ? ratios.reduce((sum, r) => sum + r.ratio, 0) / ratios.length : null;
   const received = { tUSD: 0n, tJPY: 0n };
   for (const s of p?.strategies ?? []) received[keyOf(s.quoteType)] += s.quoteReceived;
-  const liveBudgets = (p?.budgets ?? []).filter((b) => Number(b.allowance.expirationMs ?? 0n) > now && b.remaining !== 0n);
-  const loading = <Skeleton w={72} h={20} />;
+  const receivedCoins = COIN_KEYS.filter((c) => received[c] > 0n);
+  const loading = <Skeleton w={64} h={22} />;
+
+  const tabs: { value: Tab; label: string; count?: number }[] = [
+    { value: 'markets', label: 'Markets', count: p ? markets.length : undefined },
+    { value: 'budgets', label: 'Budgets', count: p ? budgets.length : undefined },
+    { value: 'activity', label: 'Activity', count: fills.value ? mine.length : undefined },
+    ...(approvals.length > 0 ? [{ value: 'approvals' as const, label: 'Approvals', count: approvals.length }] : []),
+  ];
+  // The Approvals tab disappears once the last one is revoked: fall back to Markets.
+  const current: Tab = tab === 'approvals' && approvals.length === 0 ? 'markets' : tab;
 
   return (
     <div className="page">
       {head}
-      <section className="card" aria-label="Summary">
-        <div className="stats lg">
-          {(['tUSD', 'tJPY'] as const).map((c) => (
-            <Stat key={c} label={`${c} balance`}>
-              {bal ? (
-                <>
-                  <CoinIcon coin={c} size={18} />
-                  {fmt(bal[c])}
-                </>
-              ) : (
-                loading
-              )}
-            </Stat>
-          ))}
-          <Stat label="Live budgets">{p ? liveBudgets.length : loading}</Stat>
-          <Stat label="Open markets">{p ? open.length : loading}</Stat>
-          <Stat label="Shared liquidity">{p && bal ? <span className="gold">{avgRatio === null ? '—' : `${avgRatio.toFixed(1)}×`}</span> : loading}</Stat>
-          <Stat label="Received from fills">
-            {p ? (
-              <span className="small">
-                {received.tUSD || received.tJPY ? `${fmt(received.tUSD)} tUSD · ${fmt(received.tJPY)} tJPY` : '—'}
-              </span>
-            ) : (
-              loading
-            )}
-          </Stat>
-        </div>
-        {positions.error && !p && <p className="hint bad">Could not load positions: {positions.error}</p>}
-      </section>
 
-      <div className="portfolio-grid">
-        <div className="stack">
-          <section className="card" aria-label="Liquidity budgets">
-            <div className="card-head">
-              <h2>Liquidity budgets</h2>
-              {p && <span className="chip">{liveBudgets.length} live</span>}
-            </div>
-            <p className="small muted">Allowances you granted to the executor. Funds never leave your wallet; one budget can back many markets.</p>
-            {!p ? (
-              <SkeletonRows n={2} />
-            ) : budgets.length === 0 ? (
-              <Empty
-                title="No budgets yet"
-                action={
-                  <a className="btn sm" href="#/earn">
-                    Provide liquidity
-                  </a>
-                }
-              >
-                A budget lets your wallet back markets without depositing.
-              </Empty>
-            ) : (
-              <>
-                <ul className="list">
-                  {budgetList.shown.map((b) => (
-                    <BudgetRow key={b.allowance.id} b={b} balance={bal?.[b.coin]} now={now} actions={actions} />
-                  ))}
-                </ul>
-                {budgetList.toggle}
-              </>
-            )}
-          </section>
-
-          <section className="card" aria-label="Markets">
-            <div className="card-head">
-              <h2>Markets</h2>
-              {p && <span className="chip accent">{open.length} open</span>}
-            </div>
-            {!p ? (
-              <SkeletonRows n={3} />
-            ) : markets.length === 0 ? (
-              <Empty
-                title="No markets yet"
-                action={
-                  <a className="btn sm" href="#/earn">
-                    Open a market
-                  </a>
-                }
-              >
-                Markets quote your budget to traders at your price.
-              </Empty>
-            ) : (
-              <>
-                <ul className="list">
-                  {marketList.shown.map((m) => (
-                    <MarketRow key={m.s.id} {...m} now={now} actions={actions} />
-                  ))}
-                </ul>
-                {marketList.toggle}
-              </>
-            )}
-          </section>
-        </div>
-
-        <div className="stack">
-          {p && p.approvals.length > 0 && (
-            <section className="card" aria-label="Open approvals">
-              <div className="card-head">
-                <h2>Open approvals</h2>
-                <span className="chip gold">{p.approvals.length}</span>
+      <section className="card pf-summary" aria-label="Summary">
+        <div className="pf-group">
+          <h2>Wallet</h2>
+          <div className="pf-balances">
+            {COIN_KEYS.map((c) => (
+              <div key={c} className="pf-balance">
+                <CoinIcon coin={c} size={28} />
+                <span className="pf-figure">
+                  {bal ? <span className="pf-amount">{fmt(bal[c])}</span> : loading}
+                  <span className="pf-symbol">{c}</span>
+                </span>
               </div>
-              <p className="small muted">Payment approvals from orders that never settled. Only their own order can use them, until they expire.</p>
-              <ul className="list">
-                {p.approvals.map((a) => (
-                  <ApprovalRow key={a.allowance.id} a={a} now={now} actions={actions} />
-                ))}
-              </ul>
-            </section>
-          )}
-
-          <section className="card" aria-label="Activity">
-            <div className="card-head">
-              <h2>Activity</h2>
-              {fills.value && <span className="chip">{mine.length} {mine.length === 1 ? 'fill' : 'fills'}</span>}
-            </div>
-            {!fills.value ? (
-              fills.error ? (
-                <p className="hint bad">Could not load fills: {fills.error}</p>
-              ) : (
-                <SkeletonRows n={4} />
-              )
-            ) : mine.length === 0 ? (
-              <Empty
-                title="No fills yet"
-                action={
-                  <a className="btn sm" href="#/swap">
-                    Make a swap
-                  </a>
-                }
-              >
-                Swaps, payments and fills on your markets show up here.
-              </Empty>
-            ) : (
-              <>
-                <ul className="list">
-                  {activity.shown.map((f) => (
-                    <ActivityRow key={`${f.digest}:${f.orderId}`} f={f} me={me} now={now} />
-                  ))}
-                </ul>
-                {activity.toggle}
-              </>
-            )}
-          </section>
+            ))}
+          </div>
         </div>
-      </div>
+        <div className="pf-group">
+          <h2>Liquidity</h2>
+          <div className="pf-metrics">
+            <Metric label="Live budgets">{p ? budgets.filter((b) => isLive(b, now)).length : loading}</Metric>
+            <Metric label="Open markets">{p ? open.length : loading}</Metric>
+            <Metric label="Shared liquidity" sub="advertised / executable">
+              {p && bal ? <span className="gold">{avgRatio === null ? '—' : `${avgRatio.toFixed(1)}×`}</span> : loading}
+            </Metric>
+            <Metric label="Received from fills">
+              {!p ? (
+                loading
+              ) : receivedCoins.length === 0 ? (
+                '—'
+              ) : (
+                <span className="pf-received">
+                  {receivedCoins.map((c) => (
+                    <span key={c}>
+                      {fmt(received[c])} <span className="pf-symbol">{c}</span>
+                    </span>
+                  ))}
+                </span>
+              )}
+            </Metric>
+          </div>
+        </div>
+      </section>
+      {positions.error && !p && <p className="hint bad">Could not load positions: {positions.error}</p>}
+
+      <section className="card pf-panel" aria-label="Positions">
+        <div className="card-head">
+          <Tabs label="Positions" value={current} onChange={setTab} tabs={tabs} />
+        </div>
+
+        {current === 'markets' &&
+          (!p ? (
+            <SkeletonTable cols={7} />
+          ) : markets.length === 0 ? (
+            <Empty title="No markets yet" action={<a className="btn sm" href="#/earn">Open a market</a>}>
+              A market quotes your budget to traders at your price.
+            </Empty>
+          ) : (
+            <>
+              <div className="table-wrap">
+                <table className="table pf-table">
+                  <thead>
+                    <tr>
+                      <th>Market</th>
+                      <th className="r">Price</th>
+                      <th>Sold</th>
+                      <th className="r">Received</th>
+                      <th>Status</th>
+                      <th>Ends</th>
+                      <th className="r">
+                        <span className="pf-sr">Actions</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {marketRows.shown.map((m) => (
+                      <MarketTr key={m.s.id} {...m} now={now} actions={actions} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {marketRows.toggle}
+            </>
+          ))}
+
+        {current === 'budgets' &&
+          (!p ? (
+            <SkeletonTable cols={4} />
+          ) : budgets.length === 0 ? (
+            <Empty title="No budgets yet" action={<a className="btn sm" href="#/earn">Provide liquidity</a>}>
+              A budget lets your wallet back markets without depositing.
+            </Empty>
+          ) : (
+            <>
+              <p className="small muted pf-note">Allowances you granted to the executor. Funds stay in your wallet; one budget can back many markets.</p>
+              <div className="table-wrap">
+                <table className="table pf-table">
+                  <thead>
+                    <tr>
+                      <th>Budget</th>
+                      <th>Used</th>
+                      <th>Expires</th>
+                      <th className="r">
+                        <span className="pf-sr">Actions</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {budgetRows.shown.map((b) => (
+                      <BudgetTr key={b.allowance.id} b={b} balance={bal?.[b.coin]} now={now} actions={actions} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {budgetRows.toggle}
+            </>
+          ))}
+
+        {current === 'activity' &&
+          (!fills.value ? (
+            fills.error ? <p className="hint bad">Could not load fills: {fills.error}</p> : <SkeletonTable cols={6} />
+          ) : mine.length === 0 ? (
+            <Empty title="No fills yet" action={<a className="btn sm" href="#/swap">Make a swap</a>}>
+              Swaps, payments and fills on your markets show up here.
+            </Empty>
+          ) : (
+            <>
+              <div className="table-wrap">
+                <table className="table pf-table">
+                  <thead>
+                    <tr>
+                      <th>Type</th>
+                      <th className="r">Amount</th>
+                      <th className="r">For</th>
+                      <th>With</th>
+                      <th>When</th>
+                      <th className="r">
+                        <span className="pf-sr">Transaction</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activityRows.shown.map((f) => (
+                      <ActivityTr key={`${f.digest}:${f.orderId}`} f={f} me={me} now={now} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {activityRows.toggle}
+            </>
+          ))}
+
+        {current === 'approvals' && (
+          <>
+            <p className="small muted pf-note">Payment approvals from orders that never settled. Only their own order can use them, until they expire.</p>
+            <div className="table-wrap">
+              <table className="table pf-table">
+                <thead>
+                  <tr>
+                    <th>Unspent approval</th>
+                    <th>Expires</th>
+                    <th className="r">
+                      <span className="pf-sr">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {approvals.map((a) => (
+                    <ApprovalTr key={a.allowance.id} a={a} now={now} actions={actions} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </section>
     </div>
   );
 }
 
-function BudgetRow({ b, balance, now, actions }: { b: Budget; balance: bigint | undefined; now: number; actions: Actions }) {
+function Metric({ label, sub, children }: { label: string; sub?: string; children: ReactNode }) {
+  return (
+    <div className="pf-metric">
+      <span className="pf-label">{label}</span>
+      <span className="pf-value">{children}</span>
+      {sub && <span className="sub">{sub}</span>}
+    </div>
+  );
+}
+
+function SkeletonTable({ cols, rows = 3 }: { cols: number; rows?: number }) {
+  return (
+    <div className="table-wrap" aria-busy="true" aria-label="Loading">
+      <table className="table pf-table">
+        <tbody>
+          {Array.from({ length: rows }, (_, i) => (
+            <tr key={i}>
+              {Array.from({ length: cols }, (_, j) => (
+                <td key={j}>
+                  <Skeleton w={j === 0 ? 150 : 64} h={14} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function MarketTr({ s, status, now, actions }: Market & { now: number; actions: Actions }) {
+  const base = keyOf(s.baseType);
+  const quote = keyOf(s.quoteType);
+  const total = s.baseFilled + s.virtualBaseRemaining;
+  const sold = total > 0n ? Number((s.baseFilled * 1000n) / total) / 1000 : 0;
+  const live = status === 'open' || status === 'paused';
+  const key = `toggle:${s.id}`;
+  const toggle = () =>
+    actions.act(status === 'open' ? 'Pausing market' : 'Resuming market', () => setStrategyActive(s.id, status !== 'open', { base: s.baseType, quote: s.quoteType }), {
+      done: status === 'open' ? 'Market paused' : 'Market live again',
+      key,
+    });
+  return (
+    <tr>
+      <td>
+        <div className="cell">
+          <CoinIcon coin={base} size={28} />
+          <div>
+            <b>
+              {base} → {quote}
+            </b>
+            <span className="sub">{shapeLabel(s)}</span>
+          </div>
+        </div>
+      </td>
+      <td className="r">
+        {fmt(priceOf(s), 2)}
+        <span className="sub">tJPY per tUSD</span>
+      </td>
+      <td>
+        <div className="pf-meter">
+          <Meter value={sold} label={`${Math.round(sold * 100)}% sold`} />
+        </div>
+        <span className="sub">
+          {fmt(s.baseFilled)} / {fmt(total)} {base}
+        </span>
+      </td>
+      <td className="r">
+        <span className="gold">{fmt(s.quoteReceived)}</span>
+        <span className="sub">{quote}</span>
+      </td>
+      <td>
+        <StatusChip status={status} />
+      </td>
+      <td className="muted">{live ? until(s.expiryMs, now) : '—'}</td>
+      <td className="r">
+        {live && (
+          <button type="button" className="act" disabled={!!actions.busy} onClick={toggle}>
+            {actions.busy === key ? (status === 'open' ? 'Pausing…' : 'Resuming…') : status === 'open' ? 'Pause' : 'Resume'}
+          </button>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+function BudgetTr({ b, balance, now, actions }: { b: Budget; balance: bigint | undefined; now: number; actions: Actions }) {
   const cap = b.allowance.lifetimeCap;
   const spent = b.allowance.currentSpend;
   const used = cap ? Number((spent * 1000n) / cap) / 1000 : 0;
@@ -411,47 +537,55 @@ function BudgetRow({ b, balance, now, actions }: { b: Budget; balance: bigint | 
     });
   };
   return (
-    <li className="item">
-      <div className="spread">
-        <span className="inline">
-          <CoinIcon coin={b.coin} size={22} />
-          <b>{b.coin} budget</b>
-          <span className="chip">
-            {r.markets} {r.markets === 1 ? 'market' : 'markets'}
-          </span>
-          {r.ratio > 1 && <span className="chip gold">{r.ratio.toFixed(1)}× shared</span>}
+    <tr>
+      <td>
+        <div className="cell">
+          <CoinIcon coin={b.coin} size={28} />
+          <div>
+            <b>{b.coin} budget</b>
+            <span className="sub">
+              {r.markets} {r.markets === 1 ? 'market' : 'markets'}
+              {r.ratio > 1 && <span className="gold"> · {r.ratio.toFixed(1)}× shared</span>}
+            </span>
+          </div>
+        </div>
+      </td>
+      <td>
+        <div className="pf-meter">
+          <Meter value={used} hot={used > 0.8} label={`${Math.round(used * 100)}% of budget used`} />
+        </div>
+        <span className="sub">
+          {fmt(spent)} / {cap === null ? 'no cap' : fmt(cap)} {b.coin}
         </span>
-        <button type="button" className="btn danger sm" disabled={!!actions.busy} onClick={revoke}>
+      </td>
+      <td className={expired ? 'bad' : 'muted'}>{expired ? 'Expired' : until(b.allowance.expirationMs ?? 0n, now)}</td>
+      <td className="r">
+        <button type="button" className="act danger" disabled={!!actions.busy} onClick={revoke}>
           {actions.busy === key ? 'Revoking…' : 'Revoke'}
         </button>
-      </div>
-      <Meter value={used} hot={used > 0.8} label={`${Math.round(used * 100)}% of budget used`} />
-      <div className="spread small muted">
-        <span>
-          Used <span className="num">{fmt(spent)}</span> of {cap === null ? 'no cap' : `${fmt(cap)} ${b.coin}`}
-        </span>
-        <span className={expired ? 'bad' : ''}>{expired ? 'Expired' : `Expires in ${until(b.allowance.expirationMs ?? 0n, now)}`}</span>
-      </div>
-    </li>
+      </td>
+    </tr>
   );
 }
 
-function ApprovalRow({ a, now, actions }: { a: Approval; now: number; actions: Actions }) {
+function ApprovalTr({ a, now, actions }: { a: Approval; now: number; actions: Actions }) {
   const left = (a.allowance.lifetimeCap ?? 0n) - a.allowance.currentSpend;
   const key = `revoke:${a.allowance.id}`;
   return (
-    <li className="item">
-      <div className="spread">
-        <span className="inline">
-          <CoinIcon coin={a.coin} size={22} />
-          <b className="num">
+    <tr>
+      <td>
+        <div className="cell">
+          <CoinIcon coin={a.coin} size={28} />
+          <b>
             {fmt(left)} {a.coin}
           </b>
-          <span className="small muted">expires in {until(a.allowance.expirationMs ?? 0n, now)}</span>
-        </span>
+        </div>
+      </td>
+      <td className="muted">{until(a.allowance.expirationMs ?? 0n, now)}</td>
+      <td className="r">
         <button
           type="button"
-          className="btn danger sm"
+          className="act danger"
           disabled={!!actions.busy}
           onClick={() =>
             actions.act('Revoking approval', () => revokeAllowance({ coin: COINS[a.coin].type, allowanceId: a.allowance.id, capId: a.capId }), {
@@ -462,40 +596,41 @@ function ApprovalRow({ a, now, actions }: { a: Approval; now: number; actions: A
         >
           {actions.busy === key ? 'Revoking…' : 'Revoke'}
         </button>
-      </div>
-    </li>
+      </td>
+    </tr>
   );
 }
 
 /** A fill from this wallet's side: it sold (provider), bought or paid (trader), or was paid (recipient). */
-function ActivityRow({ f, me, now }: { f: FillEvent; me: string; now: number }) {
+function ActivityTr({ f, me, now }: { f: FillEvent; me: string; now: number }) {
   const is = (a: string) => a.toLowerCase() === me;
   const base = keyOf(f.baseType);
   const quote = keyOf(f.quoteType);
-  const out = `${fmt(f.baseOut)} ${base}`;
-  const inp = `${fmt(f.quoteIn)} ${quote}`;
   const row = is(f.maker)
-    ? { label: 'Sold', tone: 'gold', detail: `for ${inp} to`, who: f.taker }
+    ? { label: 'Sold', tone: 'gold', who: f.taker }
     : is(f.taker) && is(f.recipient)
-      ? { label: 'Bought', tone: 'accent', detail: `for ${inp} from`, who: f.maker }
+      ? { label: 'Bought', tone: 'ok', who: f.maker }
       : is(f.taker)
-        ? { label: 'Paid', tone: '', detail: `cost ${inp} · to`, who: f.recipient }
-        : { label: 'Received', tone: 'accent', detail: 'from', who: f.taker };
+        ? { label: 'Paid', tone: '', who: f.recipient }
+        : { label: 'Received', tone: 'ok', who: f.taker };
   return (
-    <li className="item">
-      <div className="spread">
-        <span className="inline">
-          <span className={`chip ${row.tone}`}>{row.label}</span>
-          <b className="num">{out}</b>
-        </span>
-        <span className="small muted">{ago(f.timestampMs, now)}</span>
-      </div>
-      <div className="spread small muted">
-        <span>
-          {row.detail} <Addr a={row.who} />
-        </span>
-        {f.digest && <TxLink digest={f.digest}>Tx</TxLink>}
-      </div>
-    </li>
+    <tr>
+      <td>
+        <b className={row.tone}>{row.label}</b>
+      </td>
+      <td className="r">
+        <b>
+          {fmt(f.baseOut)} {base}
+        </b>
+      </td>
+      <td className="r muted">
+        {fmt(f.quoteIn)} {quote}
+      </td>
+      <td>
+        <Addr a={row.who} />
+      </td>
+      <td className="muted">{ago(f.timestampMs, now)}</td>
+      <td className="r">{f.digest && <TxLink digest={f.digest}>Tx</TxLink>}</td>
+    </tr>
   );
 }

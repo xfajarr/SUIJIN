@@ -1,0 +1,36 @@
+/* Portfolio: a summary strip, then one tabbed card of position tables. */
+
+.pf-summary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 0; padding: 0; }
+.pf-group { display: flex; flex-direction: column; gap: 16px; padding: 20px 22px 22px; min-width: 0; }
+.pf-group + .pf-group { border-left: 1px solid var(--line); }
+.pf-balances { display: flex; flex-wrap: wrap; gap: 14px 32px; }
+.pf-balance { display: flex; align-items: center; gap: 10px; }
+.pf-figure { display: flex; align-items: baseline; gap: 6px; }
+.pf-amount { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.pf-symbol { font-size: 14px; font-weight: 600; color: var(--muted); }
+.pf-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px 20px; }
+.pf-metric { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.pf-label { font-size: 12px; color: var(--muted); }
+.pf-value { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.pf-received { display: flex; flex-direction: column; gap: 2px; font-size: 15px; }
+.pf-received .pf-symbol { font-size: 12px; }
+
+.pf-panel { gap: 16px; }
+.pf-note { margin: 0; }
+.pf-table { min-width: 640px; }
+.pf-table b { font-weight: 700; }
+.pf-meter { width: 96px; margin-bottom: 7px; }
+.pf-table tbody tr:hover .act:not(:disabled) { color: var(--ink); }
+.pf-more { align-self: center; }
+/* Visually hidden header text. Anchored to its cell so it scrolls with the table, not the page. */
+.pf-table th { position: relative; }
+.pf-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (max-width: 760px) {
+  .pf-summary { grid-template-columns: minmax(0, 1fr); }
+  .pf-group + .pf-group { border-left: 0; border-top: 1px solid var(--line); }
+}
+@media (max-width: 520px) {
+  .pf-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pf-amount { font-size: 22px; }
+}
