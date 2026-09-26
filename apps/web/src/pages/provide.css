@@ -20,8 +20,8 @@
 /* live preview beside the form */
 .preview { position: sticky; top: 20px; }
 .preview-side { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); font-size: 13px; animation: rise 0.35s var(--ease) both; }
-.preview-side .big { font-size: 26px; }
-.preview-side .big .unit { font-family: Geist, system-ui, sans-serif; font-size: 14px; color: var(--muted); }
+.preview-side .big { font-family: inherit; font-weight: 700; font-size: 26px; letter-spacing: -0.02em; }
+.preview-side .big .unit { font-size: 14px; font-weight: 600; color: var(--muted); }
 .checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--muted); }
 .checks li { display: grid; grid-template-columns: 16px 1fr; gap: 8px; align-items: start; }
 .checks svg { color: var(--accent); margin-top: 2px; }
