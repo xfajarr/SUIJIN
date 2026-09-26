@@ -202,3 +202,49 @@ html.is-loading{overflow:hidden}
 @keyframes faq-in{from{opacity:0;transform:translateY(-6px)}}
 @media(max-width:700px){.faq{padding:14vh 20px 18vh}.faq summary{grid-template-columns:32px 1fr 26px;padding:20px 0;font-size:17px}.faq details p{padding:0 0 22px 44px;font-size:15px}}
 .product-visual img{transition:opacity .35s}.product-card[aria-hidden=true] .product-visual img{opacity:0}
+
+/* evolve easter egg: floating button + handheld-style evolution dialog */
+.evo-btn{position:fixed;z-index:45;right:24px;bottom:calc(24px + env(safe-area-inset-bottom,0px));display:inline-flex;align-items:center;gap:8px;padding:8px 16px 8px 8px;border:1px solid rgba(244,182,60,.55);border-radius:999px;background:linear-gradient(180deg,rgba(244,182,60,.22),rgba(4,20,18,.85));box-shadow:0 8px 24px rgba(0,0,0,.4),0 0 0 0 rgba(244,182,60,.5);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);font-family:'Pixelify Sans',ui-monospace,monospace;font-size:18px;color:var(--ink);animation:evo-nudge 2.8s ease-in-out infinite;transition:transform .2s}
+.evo-btn img{width:30px;height:30px;mix-blend-mode:screen}
+.evo-btn:hover{transform:translateY(-2px) scale(1.03)}
+.evo-btn:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+@keyframes evo-nudge{50%{box-shadow:0 8px 24px rgba(0,0,0,.4),0 0 0 8px rgba(244,182,60,0)}0%{box-shadow:0 8px 24px rgba(0,0,0,.4),0 0 0 0 rgba(244,182,60,.45)}}
+.evo{width:100vw;height:100dvh;max-width:none;max-height:none;margin:0;padding:0;border:0;background:transparent;color:var(--ink);overflow:hidden}
+.evo,.evo *{cursor:auto}.evo button{cursor:pointer}
+.evo::backdrop{background:radial-gradient(circle at 50% 42%,#0b3b37,#020807 70%)}
+.evo[open]{display:grid;grid-template-rows:1fr auto}
+.evo-stage{position:relative;display:grid;place-items:center;min-height:0}
+.evo-rays{position:absolute;width:140vmax;height:140vmax;background:repeating-conic-gradient(from 0deg,rgba(43,196,180,.14) 0 6deg,transparent 6deg 18deg);mask:radial-gradient(circle,#000 10%,transparent 60%);-webkit-mask:radial-gradient(circle,#000 10%,transparent 60%);animation:evo-spin 14s linear infinite;opacity:.4;transition:opacity .6s}
+.evo.charging .evo-rays{opacity:.9;animation-duration:5s}
+.evo.done .evo-rays{opacity:1;background:repeating-conic-gradient(from 0deg,rgba(244,182,60,.16) 0 6deg,transparent 6deg 18deg)}
+@keyframes evo-spin{to{transform:rotate(360deg)}}
+.evo-spirit,.evo-char{position:absolute;opacity:0;transition:opacity 60ms}
+.evo-spirit{width:min(36vmin,280px);aspect-ratio:1;filter:url(#evo-solid) drop-shadow(0 0 24px rgba(111,230,216,.9));animation:evo-pulse .9s ease-in-out infinite}
+.evo-spirit i{display:block;width:100%;height:100%;background:#fff;-webkit-mask:url(/logo.png) center/contain no-repeat;-webkit-mask-source-type:luminance;mask:url(/logo.png) center/contain no-repeat luminance}
+.evo-char{height:min(78%,720px);max-width:90vw;object-fit:contain}
+.evo-spirit.on,.evo-char.on{opacity:1}
+/* while evolving both forms are white silhouettes */
+.evo.charging .evo-char,.evo.flash .evo-char{filter:brightness(0) invert(1) drop-shadow(0 0 24px rgba(111,230,216,.9));animation:evo-pulse .9s ease-in-out infinite}
+@keyframes evo-pulse{50%{transform:scale(1.04)}}
+@keyframes evo-reveal{0%{transform:scale(.85);filter:brightness(4) drop-shadow(0 0 60px #fff)}100%{transform:none}}
+.evo.done .evo-char{filter:drop-shadow(0 0 40px rgba(43,196,180,.45));animation:evo-reveal 1.4s cubic-bezier(.22,1,.36,1) both,evo-float 4s ease-in-out 1.4s infinite}
+@keyframes evo-float{50%{transform:translateY(-10px)}}
+.evo-flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+.evo.flash .evo-flash{animation:evo-flash .65s ease-in forwards}
+.evo.done .evo-flash{animation:evo-fade .7s ease-out forwards}
+@keyframes evo-flash{to{opacity:1}}@keyframes evo-fade{from{opacity:1}to{opacity:0}}
+.evo-sparks{position:absolute;left:50%;top:50%}
+.evo-sparks i{position:absolute;width:10px;height:10px;margin:-5px;background:var(--gold);clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%);transform:rotate(var(--a)) translateY(0) scale(.2);opacity:0;animation:evo-spark 1.6s cubic-bezier(.22,1,.36,1) var(--d) forwards}
+.evo-sparks i:nth-child(even){background:var(--teal);width:14px;height:14px;margin:-7px}
+@keyframes evo-spark{15%{opacity:1}100%{transform:rotate(var(--a)) translateY(min(-38vmin,-260px)) scale(1.2);opacity:0}}
+.evo-box{position:relative;z-index:1;margin:0 auto calc(20px + env(safe-area-inset-bottom,0px));width:min(760px,calc(100vw - 32px));min-height:112px;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 24px;border:3px solid var(--ink);border-radius:14px;outline:3px solid #0b5f66;outline-offset:-9px;background:#051412;box-shadow:0 16px 50px rgba(0,0,0,.5)}
+.evo-box p{margin:0;font-family:'Pixelify Sans',ui-monospace,monospace;font-size:clamp(17px,2vw,24px);line-height:1.35}
+.evo-box b{font-weight:400;color:var(--gold)}
+.evo.charging .evo-box p::after{content:'▾';margin-left:8px;color:var(--teal);animation:evo-blink 1s steps(1) infinite}
+@keyframes evo-blink{50%{opacity:0}}
+.evo-ok{flex:none;white-space:nowrap;padding:10px 16px;border:0;border-radius:8px;background:var(--teal);color:#02201d;font-family:'Pixelify Sans',ui-monospace,monospace;font-size:17px}
+.evo-ok:hover{background:#3fd8c7}
+.evo-x{position:absolute;top:calc(16px + env(safe-area-inset-top,0px));right:16px;width:40px;height:40px;border:1px solid var(--line);border-radius:50%;background:rgba(2,8,7,.6);color:var(--ink);font-size:22px;line-height:1}
+.evo-ok:focus-visible,.evo-x:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+@media(max-width:560px){.evo-btn{right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));font-size:16px}.evo-box{flex-direction:column;align-items:stretch}.evo-ok{align-self:flex-end}}
+@media(prefers-reduced-motion:reduce){.evo-btn{animation:none}}
