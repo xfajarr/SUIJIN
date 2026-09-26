@@ -538,7 +538,7 @@ function Preview({ plan, P, shape, feeBps, depth, expiresAtMs, now }: { plan: Si
               <span>Price</span>
               <span>
                 {start === null ? dash : <b>1 tUSD = {num(start)} tJPY</b>}
-                {start !== null && Pn !== null && <span className="faint"> · {sellsJpy ? '−' : '+'}{feeLabel} vs market</span>}
+                {start !== null && Pn !== null && <span className="pv-tag">{sellsJpy ? '−' : '+'}{feeLabel} vs market</span>}
               </span>
             </div>
             <div className="kv">
@@ -553,7 +553,7 @@ function Preview({ plan, P, shape, feeBps, depth, expiresAtMs, now }: { plan: Si
                     <b className="gold">
                       ≈ {num(total)} {pay}
                     </b>
-                    {shape === 'curve' && flat !== null && <span className="faint"> · {pctOf(total - flat)} vs market</span>}
+                    {shape === 'curve' && flat !== null && <span className="pv-tag up">{pctOf(total - flat)} vs market</span>}
                   </>
                 ) : amount !== null ? (
                   <span className="faint">never fully sells</span>
@@ -572,7 +572,7 @@ function Preview({ plan, P, shape, feeBps, depth, expiresAtMs, now }: { plan: Si
                     <b>
                       ≈ {num(feePart)} {pay}
                     </b>
-                    <b className="ok"> · {pctOf(feePart)}</b>
+                    <span className="pv-tag up">{pctOf(feePart)}</span>
                   </>
                 )}
               </span>
