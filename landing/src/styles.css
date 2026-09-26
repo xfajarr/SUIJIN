@@ -180,4 +180,25 @@ html.is-loading{overflow:hidden}
 .product-visual{padding:20px}}
 @media(max-width:520px){.products-nav{grid-template-columns:repeat(2,auto);gap:12px 24px}.products-inner{padding-inline:18px}.product-card h3{font-size:26px;margin-bottom:14px}.product-card p{font-size:14px}.product-visual{padding:18px}}
 
+/* faq: native exclusive <details> accordion */
+.faq{position:relative;z-index:30;padding:18vh 40px 22vh;background:var(--bg)}
+.faq-head{max-width:1040px;margin:0 auto 48px;display:grid;justify-items:start;gap:16px}
+.faq h2{margin:0;font-size:clamp(44px,5.4vw,76px)}
+.faq-head p{margin:0;max-width:52ch;color:var(--mute);font-size:17px;line-height:1.5}
+.faq-list{max-width:1040px;margin:0 auto;border-top:1px solid var(--line)}
+.faq details{border-bottom:1px solid var(--line)}
+.faq summary{display:grid;grid-template-columns:48px 1fr 28px;align-items:center;gap:12px;padding:26px 0;list-style:none;cursor:pointer;font-size:clamp(18px,1.6vw,24px);font-weight:600;transition:color .2s}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary:hover,.faq details[open] summary{color:var(--teal)}
+.faq summary:focus-visible{outline:2px solid var(--gold);outline-offset:4px;border-radius:6px}
+.faq-num{font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;font-weight:400;letter-spacing:.08em;color:var(--mute)}
+.faq-icon{position:relative;width:28px;height:28px;border:1px solid var(--line);border-radius:50%}
+.faq-icon::before,.faq-icon::after{content:"";position:absolute;left:50%;top:50%;width:11px;height:1.5px;background:currentColor;transform:translate(-50%,-50%);transition:transform .25s}
+.faq-icon::after{transform:translate(-50%,-50%) rotate(90deg)}
+.faq details[open] .faq-icon{border-color:rgba(43,196,180,.6)}
+.faq details[open] .faq-icon::after{transform:translate(-50%,-50%) rotate(0)}
+.faq details p{margin:0;padding:0 40px 28px 60px;max-width:72ch;color:var(--mute);font-size:16px;line-height:1.6;animation:faq-in .3s ease}
+.faq details p a{color:var(--teal)}
+@keyframes faq-in{from{opacity:0;transform:translateY(-6px)}}
+@media(max-width:700px){.faq{padding:14vh 20px 18vh}.faq summary{grid-template-columns:32px 1fr 26px;padding:20px 0;font-size:17px}.faq details p{padding:0 0 22px 44px;font-size:15px}}
 .product-visual img{transition:opacity .35s}.product-card[aria-hidden=true] .product-visual img{opacity:0}
