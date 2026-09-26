@@ -8,6 +8,7 @@ import { Transaction } from '@mysten/sui/transactions';
 import {
   DEPLOYMENT,
   addressBalance,
+  balanceKey,
   buildFill,
   buildQuotes,
   createCurveStrategy,
@@ -104,7 +105,7 @@ const allowance = await eventually(() => getAllowance(allowanceId, d), (a) => a 
 const quotes = buildQuotes({
   strategies: mine,
   allowances: new Map([[allowanceId, allowance!]]),
-  makerBalances: new Map([[maker.toSuiAddress(), makerJpy0]]),
+  makerBalances: new Map([[balanceKey(maker.toSuiAddress(), t.base), makerJpy0]]),
   quoteIn: 10_000_000n,
   nowMs: Date.now(),
 });
@@ -123,6 +124,8 @@ const paymentId = placed.created('::allowance::Allowance<');
 check((await addressBalance(client, taker.toSuiAddress(), t.quote)) === takerUsd0, 'placing the order moved zero tUSD');
 
 step('executor settles both sides in ONE PTB');
+const makerUsd0 = await addressBalance(client, maker.toSuiAddress(), t.quote);
+const takerJpy0 = await addressBalance(client, taker.toSuiAddress(), t.base);
 const fill = await run(
   'fill',
   buildFill({ strategyId: best.strategyId, orderId, maker: maker.toSuiAddress(), makerAllowanceId: allowanceId, taker: taker.toSuiAddress(), takerAllowanceId: paymentId, baseOut: best.baseOut, quoteIn: best.quoteIn }, d),
@@ -131,8 +134,8 @@ const fill = await run(
 const order = await eventually(() => getOrder(orderId, d), (o) => o?.status === 'filled');
 check(order?.status === 'filled', `order filled (${fill.digest})`);
 check((await addressBalance(client, maker.toSuiAddress(), t.base)) === makerJpy0 - best.baseOut, `maker tJPY -${formatUnits(best.baseOut)}`);
-check((await addressBalance(client, maker.toSuiAddress(), t.quote)) === best.quoteIn, `maker tUSD +${formatUnits(best.quoteIn)}`);
-check((await addressBalance(client, taker.toSuiAddress(), t.base)) === best.baseOut, `taker tJPY +${formatUnits(best.baseOut)}`);
+check((await addressBalance(client, maker.toSuiAddress(), t.quote)) - makerUsd0 === best.quoteIn, `maker tUSD +${formatUnits(best.quoteIn)}`);
+check((await addressBalance(client, taker.toSuiAddress(), t.base)) - takerJpy0 === best.baseOut, `taker tJPY +${formatUnits(best.baseOut)}`);
 const chosen = await eventually(() => getStrategy(best.strategyId, d), (s) => s?.fillCount === 1n);
 check(chosen?.baseFilled === best.baseOut, 'strategy recorded the fill');
 
