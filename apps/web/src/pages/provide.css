@@ -34,6 +34,8 @@
 .pv-note { margin: -4px 0 0; font-size: 12px; line-height: 1.45; color: var(--faint); }
 .pv-flat { margin: 0; padding: 10px 12px; border-radius: 12px; background: rgba(232, 251, 247, 0.04); font-size: 13px; line-height: 1.5; color: var(--muted); }
 .pv-flat b { color: var(--ink); }
+.pv-title { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.pv-foot { margin: 0; font-size: 12px; color: var(--faint); }
 .pv-total { padding-top: 8px; border-top: 1px dashed var(--line); font-size: 14px; }
 .pv-total b { font-size: 16px; }
 /* price chart in the preview: price vs how much has sold */

@@ -97,10 +97,11 @@ export function PriceChart(p: Props) {
           <b className="num">{nf(ys[N]!)}</b> <span className="faint">{partial ? 'at 90% sold' : 'all sold'}</span>
         </span>
       </div>
-      <p className="pchart-tip" aria-live="polite">
-        {hover === null ? 'Hover or drag across the chart: ' : ''}after selling <b>{nf(sold)} {p.coin}</b>, your price is <b>{nf(priceNow)}</b> and you have
-        received <b className="gold">{nf(got)} {pay}</b>.
-      </p>
+      {(
+        <p className="pchart-tip" aria-live="polite" style={{ visibility: hover === null ? 'hidden' : 'visible' }}>
+          Sold <b>{nf(sold)} {p.coin}</b> · price <b>{nf(priceNow)}</b> · received <b className="gold">{nf(got)} {pay}</b>
+        </p>
+      )}
     </figure>
   );
 }
