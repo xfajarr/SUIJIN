@@ -201,6 +201,8 @@ From `bun run e2e` and `bun run smoke` on testnet:
 | Executor asks for more than the quote | refused before execution (abort code 5, `EWrongMakerAmount`) |
 | Provider revokes, next fill fails | [3XPqqxYP…](https://suiscan.xyz/testnet/tx/3XPqqxYP9nYmwUNCFkeyjpaNPSmudwcMTxF1SFykjK6L) |
 | Fill requested over HTTP right after the order | [2GddsdppM…](https://suiscan.xyz/testnet/tx/2GddsdppM5AZXDPy9oQLwQWNNgjjxKU2xP3NpJKHDTsa) |
+| Web app, Pay: recipient gets exactly 5 tUSD, payer spends tJPY (order) | [B7nUsT7E…](https://suiscan.xyz/testnet/tx/B7nUsT7EnQUDnEpfjyzLz69KHgKyYr7cHbQDRThwRhc6) |
+| Web app, Pay: settlement on the reverse market | [6GphQuaG…](https://suiscan.xyz/testnet/tx/6GphQuaGGtFg6w3DhJGRq7vaahQ63JpDJFTVckTyS2qm) |
 
 ## Repository layout
 
@@ -209,8 +211,8 @@ contracts/suijin/      Move: app (Allowance binding), math, strategy, order, set
 contracts/mock_coins/  Move: tUSD and tJPY test coins with open faucets
 packages/sdk/          TypeScript: transaction builders, chain reads, math mirror, quote engine
 apps/server/           Bun: POST /v1/quote (resolver) and POST /v1/orders/:id/fill (executor)
-apps/web/              web app (frontend team), talks to apps/server and @suijin/sdk
-scripts/               deploy.ts, e2e.ts (live proof), smoke-server.ts (live HTTP test)
+apps/web/              web app: Swap, Pay, Earn, Limit, Portfolio (React + dApp Kit)
+scripts/               deploy.ts, e2e.ts (live proof), smoke-server.ts, smoke-defi.ts (live HTTP tests)
 docs/superpowers/plans implementation plan with every design decision
 ```
 
@@ -226,13 +228,19 @@ bun run deploy                 # publishes with the executor key, writes deploym
 bun run server                 # resolver + executor on http://localhost:8790
 bun run e2e                    # live end-to-end proof (needs funded provider and trader keys)
 bun run smoke                  # live HTTP test against the running server
+bun run smoke:defi             # two-sided liquidity, reverse swap and exact-output payment over HTTP
+bun run web                    # web app on http://localhost:5173
 ```
+
+The web app reads `VITE_SERVER_URL` (default `http://localhost:8790`). To rehearse without a wallet
+extension, start it with `VITE_BURNER=1`: dApp Kit then offers an in-browser burner wallet (fund it
+with testnet SUI, then press Faucet for tUSD and tJPY).
 
 Tests:
 
 ```bash
 cd contracts/suijin && sui move test   # 26 Move tests
-bun run test:ts                        # 24 TypeScript tests
+bun run test:ts                        # 39 TypeScript tests
 bunx tsc -p tsconfig.json              # typecheck sdk, server, scripts
 ```
 
@@ -245,8 +253,14 @@ names use the code's terms: `maker` means provider, `taker` means trader.
 |---|---|---|
 | `GET /v1/health` | | `{ ok, network, executor }` |
 | `GET /v1/strategies` | | every strategy with its live state |
-| `POST /v1/quote` | `{ "quoteIn": "10000000" }` | executable quotes, best first: `strategyId, kind, maker, makerAllowanceId, quoteIn, baseOut, minBaseOut, expiresAtMs` |
+| `POST /v1/quote` | `{ "sell": "tUSD", "buy": "tJPY", "amountIn": "10000000", "slippageBps": 50 }` | executable quotes, best first: `strategyId, kind, maker, makerAllowanceId, baseType, quoteType, quoteIn, baseOut, minBaseOut, expiresAtMs, impactBps, feeBps` |
 | `POST /v1/orders/{orderId}/fill` | `{ "takerAllowanceId": "0x…" }` | `{ ok: true, digest }`, or `{ ok: false, error }` with HTTP 409 |
+
+Quote bodies: `sell` and `buy` are `tUSD`, `tJPY` or full coin types, in either direction. Send
+`amountIn` (exact input: most output first) or `amountOut` (exact output, as Pay uses: cheapest input
+first, `minBaseOut` equals the target and `quoteIn` carries the `slippageBps` buffer). `slippageBps`
+is 0 to 1000, default 100. The original `{ "quoteIn": "…" }` body still means pay tUSD, receive tJPY.
+Quotes are priced from fullnode state, not the indexer, so they match what settlement recomputes.
 
 Fill errors include `ORDER_ALREADY_FILLED`, `ORDER_EXPIRED`, `STRATEGY_PAUSED`,
 `ALLOWANCE_REVOKED`, `WRONG_TAKER_ALLOWANCE` and `SLIPPAGE_EXCEEDED`. Repeating a fill request
@@ -271,6 +285,7 @@ const tx = createTakerOrder({
   quotedBaseOut: BigInt(best.baseOut),
   expiresAtMs: Date.now() + 5 * 60_000,
   recipient: account.address,
+  pair: { base: best.baseType, quote: best.quoteType },
 });
 // Sign with the wallet, then read the effects with { effects: true, objectTypes: true }:
 // the created '::order::SwapOrder<' is orderId, the created '::allowance::Allowance<' is takerAllowanceId.
@@ -281,13 +296,25 @@ await fetch(`${SERVER}/v1/orders/${orderId}/fill`, {
 });
 ```
 
-The other builders:
-- Provider: `issueMakerAllowance`, `createFixedStrategy`, `createCurveStrategy`, `setStrategyActive`, `revokeAllowance`
+The other builders (each takes an optional `pair`; the default market sells tJPY for tUSD):
+- Provider: `issueMakerAllowance`, `issueAllowances` (several budgets, one PTB), `createFixedStrategy`,
+  `createCurveStrategy`, `createStrategies` (several markets, one PTB), `setStrategyActive`, `revokeAllowance`
 - Trader: `cancelOrder`
-- Test coins: `mintTestCoin`
+- Test coins: `mintTestCoin`, `mintTestCoins`
 
-The readers are `listStrategies`, `getStrategy`, `getOrder`, `getAllowance`, `listAllowanceCaps` and
-`addressBalance`.
+The readers are `listStrategies`, `getStrategy`, `getOrder`, `getAllowance`, `listAllowanceCaps`,
+`listFills` and `addressBalance` (GraphQL, for discovery and history), plus `freshStrategies`,
+`freshAllowances` and `freshOrder` (gRPC, no indexer lag, for anything that prices or settles).
+
+## Web app
+
+| Page | What a user does | What it shows about the mechanism |
+|---|---|---|
+| Swap | Trade either direction, typing the amount in or the amount out | One signature: an exact-cap payment Allowance plus the order. The executor settles both sides in one PTB and pays that gas |
+| Pay | Send someone an exact amount in the coin they want, or share a request link | Exact-output quotes: the recipient gets at least the target, any surplus goes to them |
+| Earn | Provide both sides of a market from one wallet: curve or fixed price, fee tier, depth | Budgets are Allowances. One budget can back several markets: nothing is deposited |
+| Limit | Place fixed-price sell orders | A fixed-price strategy on its own budget. Nothing is locked while it waits |
+| Portfolio | See budgets, markets, unspent approvals and fills | Revoking deletes the Allowance, and every market on it stops |
 
 ## Positioning
 
