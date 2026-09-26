@@ -51,7 +51,7 @@ async function quotes(quoteIn: bigint) {
 }
 
 const server = Bun.serve({
-  port: Number(process.env.PORT ?? 8787),
+  port: Number(process.env.PORT ?? 8790),
   routes: {
     '/v1/health': () => json({ ok: true, network: DEPLOYMENT.network, executor: DEPLOYMENT.executor }),
     '/v1/strategies': { GET: async () => json(await listStrategies()), OPTIONS: preflight },
