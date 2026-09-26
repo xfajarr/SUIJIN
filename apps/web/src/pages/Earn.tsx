@@ -268,9 +268,9 @@ const SHAPES: { value: Shape; title: string; caption: string; icon: ReactNode }[
 ];
 const FEES = [
   // What the provider keeps on each trade. Lower = better price for traders, so the router picks you first.
-  { value: 5, title: '0.05%', caption: 'Picked first by traders, earns the least per trade' },
-  { value: 30, title: '0.30%', caption: 'Balanced: steady fills and earnings' },
-  { value: 100, title: '1.00%', caption: 'Earns the most per trade, fills less often' },
+  { value: 5, title: '0.05%', caption: 'Best price for traders: the router picks your market first' },
+  { value: 30, title: '0.30%', caption: 'Balanced: a fair price for traders, steady earnings for you' },
+  { value: 100, title: '1.00%', caption: 'Most per fill, but traders pick your market less often' },
 ];
 const DEPTHS = [
   // Virtual pool = budget × depth; the budget still caps what can sell. Deeper = flatter price.
@@ -405,8 +405,8 @@ export function Earn() {
                 />
                 <PriceStepper price={price} onChange={setPrice} mid={market.mid} loading={market.loading} sides={sides} />
                 <div className="knob">
-                  <span>You earn per trade</span>
-                  <Segmented label="You earn per trade" value={feeBps} options={FEES.map((o) => ({ value: o.value, label: o.title }))} onChange={setFeeBps} />
+                  <span>Your fee on each fill</span>
+                  <Segmented label="Your fee on each fill" value={feeBps} options={FEES.map((o) => ({ value: o.value, label: o.title }))} onChange={setFeeBps} />
                 </div>
                 <p className="knob-note">{FEES.find((o) => o.value === feeBps)?.caption}</p>
                 {shape === 'curve' && (
