@@ -1,47 +1,73 @@
-# Suijin: One Balance, Many Markets
+<p align="center">
+  <img src="docs/assets/suijin-logo.png" alt="Suijin logo" width="160">
+</p>
 
-**One self-custodial wallet balance can back several market strategies on Sui.** A maker grants one
-bounded, revocable, app-bound Allowance. Funds stay in the maker's address balance until a trade
+<h1 align="center">Suijin</h1>
+
+<p align="center"><b>One balance, many markets.</b></p>
+
+**One self-custodial wallet balance can back several markets on Sui.** A provider grants one bounded,
+revocable, app-bound Allowance. Funds stay in the provider's own address balance until a trade
 actually settles, and then it settles atomically in a single programmable transaction block (PTB).
 
 Built at ETHGlobal Tokyo 2026 for the Sui DeFi & Payments track. **Testnet only. Unaudited.**
+
+| Term | Meaning |
+|---|---|
+| **Provider** | Anyone who makes their tokens available to trade: a person, a DAO treasury, a token team, a payments app, a market maker. Called `maker` in the code. |
+| **Trader** | Anyone who swaps against that liquidity. Called `taker` in the code. |
+| **Allowance** | A native Sui permission: "this spender may pull up to X of my tokens until time T." Not a deposit. |
+| **Executor** | The service that submits settlement transactions. It can only act through Suijin's Move rules. |
 
 ---
 
 ## The problem
 
-Market makers and treasuries have to split inventory across venues: some to an AMM, some to limit
-orders, some to OTC. Each venue only sees its slice, so every market is thin and most capital sits
-idle.
+Putting tokens to work on-chain almost always means **depositing them** into an AMM pool, an order
+book, a lending market or a vault. Every deposit:
+
+- **locks a separate slice** of your balance, so the same tokens can serve only one venue at a time;
+- **hands custody to a contract**, so you carry that protocol's risk and must withdraw to get your
+  funds back;
+- **sits idle** whenever that venue is quiet.
+
+This hits everyone who holds tokens, not only professionals:
+
+- a person who wants to sell part of their balance at a target price;
+- a DAO or token team supporting its own market;
+- a payments app holding stablecoin float;
+- a market maker quoting several pairs.
+
+Liquidity ends up thin and fragmented, and capital stays locked where it is least needed.
 
 ## The idea
 
 Sui now has **address balances** and **native Allowances**. An Allowance is a permission, not a
-deposit: the funder names a spender, a cap and an expiry, and can revoke at any time. An
+deposit: the owner names a spender, a cap and an expiry, and can revoke at any time. An
 **app-bound** Allowance can only be spent through one Move package, so that package's rules
 decide every pull.
 
-Suijin uses one app-bound Allowance as the custody layer for several strategies:
+Suijin uses one app-bound Allowance as the custody layer for several markets at once:
 
 ```mermaid
 flowchart LR
     subgraph Wallets["Wallets (address balances)"]
-        M["Maker<br/>1,000,000 tJPY"]
-        T["Taker<br/>tUSD"]
+        P["Provider<br/>1,000,000 tJPY"]
+        T["Trader<br/>tUSD"]
     end
     subgraph Offchain["Off-chain"]
         S["suijin server<br/>resolver + executor"]
     end
     subgraph Sui["Sui testnet · package suijin"]
-        A[("Maker Allowance<br/>app-bound, capped, revocable")]
+        A[("Provider Allowance<br/>app-bound, capped, revocable")]
         SA["Strategy A<br/>fixed rate"]
         SB["Strategy B<br/>virtual curve"]
-        O["SwapOrder<br/>+ exact-cap taker Allowance"]
+        O["SwapOrder<br/>+ exact-cap trader Allowance"]
         F{{"settlement::fill"}}
     end
-    M -- "grant once" --> A
-    M -- "create" --> SA
-    M -- "create" --> SB
+    P -- "grant once" --> A
+    P -- "create" --> SA
+    P -- "create" --> SB
     SA -. "quotes against" .-> A
     SB -. "quotes against" .-> A
     T -- "one signature" --> O
@@ -49,41 +75,41 @@ flowchart LR
     S -- "one PTB" --> F
     F -- "pull tJPY" --> A
     F -- "pull tUSD" --> O
-    F -- "tUSD" --> M
+    F -- "tUSD" --> P
     F -- "tJPY" --> T
 ```
 
-Both strategies advertise the full 1,000,000 tJPY (a **Shared Liquidity Ratio** of 2.0×). Only
+Both strategies advertise the full 1,000,000 tJPY, a **Shared Liquidity Ratio** of 2.0×. Only
 1,000,000 real tJPY exists, and every fill draws on the same balance and the same Allowance cap, so
-fills can never spend more than is really there.
+fills can never spend more than is really there. The provider never deposits anything.
 
 ## A trade, end to end
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Maker
-    actor Taker
+    actor Provider
+    actor Trader
     participant Server as suijin server
     participant Chain as Sui (suijin package)
-    Maker->>Chain: mint tJPY into the maker address balance
-    Maker->>Chain: allowance::propose_for_app + app::issue_maker_allowance
+    Provider->>Chain: mint tJPY into the provider address balance
+    Provider->>Chain: allowance::propose_for_app + app::issue_maker_allowance
     Note right of Chain: Allowance (shared) + AllowanceCap<br/>no funds move
-    Maker->>Chain: strategy::create_fixed and strategy::create_curve
+    Provider->>Chain: strategy::create_fixed and strategy::create_curve
     Note right of Chain: two strategies, one Allowance
-    Taker->>Server: POST /v1/quote with quoteIn
+    Trader->>Server: POST /v1/quote with quoteIn
     Server->>Chain: read strategies and allowances (GraphQL), balances (gRPC)
-    Server-->>Taker: executable quotes, best first
-    Taker->>Chain: propose_for_app (cap = quoteIn) + order::create
-    Note right of Chain: taker Allowance + SwapOrder<br/>no funds move
-    Taker->>Server: POST /v1/orders/{id}/fill with takerAllowanceId
+    Server-->>Trader: executable quotes, best first
+    Trader->>Chain: propose_for_app (cap = quoteIn) + order::create
+    Note right of Chain: trader Allowance + SwapOrder<br/>no funds move
+    Trader->>Server: POST /v1/orders/{id}/fill with takerAllowanceId
     Server->>Server: wait for the indexer, pre-check the fill
     Server->>Chain: one PTB: settlement::fill with two allowance withdrawals
     Chain->>Chain: recompute price, check caps, expiry and recipients
-    Chain-->>Maker: tUSD into the maker address balance
-    Chain-->>Taker: tJPY into the taker address balance
-    Server-->>Taker: ok + transaction digest
-    Maker->>Chain: allowance::revoke (any time)
+    Chain-->>Provider: tUSD into the provider address balance
+    Chain-->>Trader: tJPY into the trader address balance
+    Server-->>Trader: ok + transaction digest
+    Provider->>Chain: allowance::revoke (any time)
     Note right of Chain: every later fill fails
 ```
 
@@ -99,14 +125,14 @@ flowchart TD
     c1 -- "no" --> abort
     c1 -- "yes" --> c2{"order open, not expired,<br/>for this strategy?"}
     c2 -- "no" --> abort
-    c2 -- "yes" --> c3{"maker Allowance is the strategy's,<br/>taker Allowance has the taker as funder,<br/>exact cap and same expiry?"}
+    c2 -- "yes" --> c3{"provider Allowance is the strategy's,<br/>trader Allowance has the trader as funder,<br/>exact cap and same expiry?"}
     c3 -- "no" --> abort
-    c3 -- "yes" --> c4{"recomputed output within strategy limits<br/>and at least the taker minimum?"}
+    c3 -- "yes" --> c4{"recomputed output within strategy limits<br/>and at least the trader minimum?"}
     c4 -- "no" --> abort
     c4 -- "yes" --> spend["spend both Allowances<br/>via the package-only permit"]
     spend --> c5{"withdrawn balances equal<br/>the computed amounts exactly?"}
     c5 -- "no" --> abort
-    c5 -- "yes" --> settle["update strategy, mark order filled,<br/>tUSD to maker, tJPY to recipient, emit Fill"]
+    c5 -- "yes" --> settle["update strategy, mark order filled,<br/>tUSD to provider, tJPY to recipient, emit Fill"]
     abort["abort: the whole PTB reverts, nothing moves"]
 ```
 
@@ -114,9 +140,9 @@ flowchart TD
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Open: taker creates order
+    [*] --> Open: trader creates order
     Open --> Filled: executor settles
-    Open --> Cancelled: taker cancels
+    Open --> Cancelled: trader cancels
     Open --> Expired: clock passes expiry
     Filled --> [*]
     Cancelled --> [*]
@@ -132,7 +158,7 @@ Both formulas live in `contracts/suijin/sources/math.move` and are mirrored byte
 
 - **Fixed rate:** `base_out = floor(quote_in × price_den / price_num)`.
 - **Virtual curve:** constant product `x · y = k` on virtual reserves, with the fee taken from the
-  input. The new base reserve rounds **up**, so rounding dust always stays with the maker.
+  input. The new base reserve rounds **up**, so rounding dust always stays with the provider.
 - All math runs in u128, so u64 inputs cannot overflow.
 
 ## Security model
@@ -140,11 +166,11 @@ Both formulas live in `contracts/suijin/sources/math.move` and are mirrored byte
 | The executor can | The executor cannot |
 |---|---|
 | Delay or censor orders | Change a price or amount: Move recomputes both and checks the withdrawn balances exactly |
-| Choose the order of fills | Change a recipient: the maker is fixed in the strategy, the taker's recipient in the order |
-| | Spend through any other path: only `suijin::app` can mint a permit, and only `settlement::fill` uses it |
+| Choose the order of fills | Change a recipient: the provider is fixed in the strategy, the trader's recipient in the order |
+| | Spend through any other path: only `suijin::app` can mint a spend permit, and only `settlement::fill` uses it |
 | | Exceed a cap, an expiry or the real balance: the Sui framework enforces these |
 
-The maker can revoke at any time. Revocation deletes the Allowance, so no later fill can even be
+The provider can revoke at any time. Revocation deletes the Allowance, so no later fill can even be
 built.
 
 ## Live on Sui testnet
@@ -167,13 +193,13 @@ From `bun run e2e` and `bun run smoke` on testnet:
 
 | Step | Transaction |
 |---|---|
-| Maker grants one app-bound Allowance | [21UMDykb…](https://suiscan.xyz/testnet/tx/21UMDykb1nC7sjiB5nu9MP7X1ohmhArBhkrJy8atM5Lt) |
+| Provider grants one app-bound Allowance | [21UMDykb…](https://suiscan.xyz/testnet/tx/21UMDykb1nC7sjiB5nu9MP7X1ohmhArBhkrJy8atM5Lt) |
 | Fixed-rate strategy on that Allowance | [4hJZkUmz…](https://suiscan.xyz/testnet/tx/4hJZkUmzxncJ5w1z8dBfjAoZYSr7m4vhfZtaTJatrHYo) |
 | Curve strategy on the same Allowance (zero tJPY moved) | [5sXjSR9C…](https://suiscan.xyz/testnet/tx/5sXjSR9CedaTPTPuNkn1kjbC7pMrJU85eyBPQdBd4VpT) |
-| Taker: exact-cap payment Allowance + order, one signature | [JAwmkCVF…](https://suiscan.xyz/testnet/tx/JAwmkCVFiaLTGSbTvx5b936JSNVxHUQazv6wUji6Ggr9) |
+| Trader: exact-cap payment Allowance + order, one signature | [JAwmkCVF…](https://suiscan.xyz/testnet/tx/JAwmkCVFiaLTGSbTvx5b936JSNVxHUQazv6wUji6Ggr9) |
 | **Fill: one PTB, two Allowance withdrawals** | [4gTnkPqs…](https://suiscan.xyz/testnet/tx/4gTnkPqsS7xaWog9N93tNHK1ba4LV99WSRyWMsyWM6an) |
 | Executor asks for more than the quote | refused before execution (abort code 5, `EWrongMakerAmount`) |
-| Maker revokes, next fill fails | [3XPqqxYP…](https://suiscan.xyz/testnet/tx/3XPqqxYP9nYmwUNCFkeyjpaNPSmudwcMTxF1SFykjK6L) |
+| Provider revokes, next fill fails | [3XPqqxYP…](https://suiscan.xyz/testnet/tx/3XPqqxYP9nYmwUNCFkeyjpaNPSmudwcMTxF1SFykjK6L) |
 | Fill requested over HTTP right after the order | [2GddsdppM…](https://suiscan.xyz/testnet/tx/2GddsdppM5AZXDPy9oQLwQWNNgjjxKU2xP3NpJKHDTsa) |
 
 ## Repository layout
@@ -195,10 +221,10 @@ You need Bun 1.3+ and the Sui CLI **1.80 or newer** (`brew upgrade sui`). Older 
 
 ```bash
 bun install
-cp .env.example .env           # fill EXECUTOR_, MAKER_, TAKER_SECRET_KEY (suiprivkey1...)
+cp .env.example .env           # EXECUTOR_, MAKER_ (provider), TAKER_ (trader) SECRET_KEY = suiprivkey1...
 bun run deploy                 # publishes with the executor key, writes deployment.json
 bun run server                 # resolver + executor on http://localhost:8790
-bun run e2e                    # live end-to-end proof (needs funded maker and taker)
+bun run e2e                    # live end-to-end proof (needs funded provider and trader keys)
 bun run smoke                  # live HTTP test against the running server
 ```
 
@@ -212,7 +238,8 @@ bunx tsc -p tsconfig.json              # typecheck sdk, server, scripts
 
 ## API for frontends
 
-All amounts are integer strings in base units (6 decimals for tUSD and tJPY).
+All amounts are integer strings in base units (6 decimals for tUSD and tJPY). Field and function
+names use the code's terms: `maker` means provider, `taker` means trader.
 
 | Endpoint | Body | Response |
 |---|---|---|
@@ -255,8 +282,8 @@ await fetch(`${SERVER}/v1/orders/${orderId}/fill`, {
 ```
 
 The other builders:
-- Maker: `issueMakerAllowance`, `createFixedStrategy`, `createCurveStrategy`, `setStrategyActive`, `revokeAllowance`
-- Taker: `cancelOrder`
+- Provider: `issueMakerAllowance`, `createFixedStrategy`, `createCurveStrategy`, `setStrategyActive`, `revokeAllowance`
+- Trader: `cancelOrder`
 - Test coins: `mintTestCoin`
 
 The readers are `listStrategies`, `getStrategy`, `getOrder`, `getAllowance`, `listAllowanceCaps` and
@@ -266,7 +293,8 @@ The readers are `listStrategies`, `getStrategy`, `getOrder`, `getAllowance`, `li
 
 - **DeepBook** unifies order flow.
 - **STEAMM** optimizes deposited liquidity.
-- **Suijin** multiplexes self-custodial maker inventory before it is committed to any venue.
+- **Suijin** lets self-custodial balances serve many markets before anything is committed to a
+  venue.
 
 The shared-liquidity insight comes from 1inch Aqua; Aqua0 explored it on EVM. Suijin rebuilds it
 on Sui primitives: address balances, app-bound Allowances and PTBs.
@@ -275,7 +303,7 @@ on Sui primitives: address balances, app-bound Allowances and PTBs.
 
 - The Shared Liquidity Ratio is availability, not TVL, not collateral and not leverage.
 - Not every advertised position can fill at the same time.
-- An Allowance is a permission, not a guarantee: a maker can move their funds at any time.
+- An Allowance is a permission, not a guarantee: a provider can move their funds at any time.
 - The single executor can delay or censor orders.
 - Allowances are enabled on Sui testnet and devnet, not yet on mainnet (checked 26 Sep 2026).
 - This code is unaudited hackathon software.
