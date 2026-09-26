@@ -36,6 +36,7 @@ export function planFill(
       takerAllowanceId,
       baseOut,
       quoteIn: order.quoteIn,
+      pair: { base: strategy.baseType, quote: strategy.quoteType },
     },
   };
 }

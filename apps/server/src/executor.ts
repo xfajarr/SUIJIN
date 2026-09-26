@@ -1,6 +1,6 @@
 import type { SuiGrpcClient } from '@mysten/sui/grpc';
 import type { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
-import { buildFill, getAllowance, getOrder, getStrategy } from '@suijin/sdk';
+import { buildFill, freshAllowances, freshOrder, freshStrategies } from '@suijin/sdk';
 import { eventually } from './eventually';
 import { planFill } from './plan';
 
@@ -21,11 +21,12 @@ export function fillOrder(client: SuiGrpcClient, signer: Ed25519Keypair, orderId
 }
 
 async function settle(client: SuiGrpcClient, signer: Ed25519Keypair, orderId: string, takerAllowanceId: string): Promise<FillOutcome> {
-  // The web app asks for a fill right after the order tx lands; the indexer can be a few seconds behind.
-  const order = await eventually(() => getOrder(orderId));
+  // Read straight from the fullnode: the amounts must match what Move recomputes at settlement.
+  // eventually() covers a fill request that races the order tx to a different fullnode replica.
+  const order = await eventually(() => freshOrder(client, orderId));
   const [strategy, payment] = await Promise.all([
-    order ? getStrategy(order.strategyId) : null,
-    eventually(() => getAllowance(takerAllowanceId)),
+    order ? freshStrategies(client, [order.strategyId]).then((s) => s[0] ?? null) : null,
+    eventually(async () => (await freshAllowances(client, [takerAllowanceId])).get(takerAllowanceId) ?? null),
   ]);
   const plan = planFill(order, strategy, payment, takerAllowanceId, Date.now());
   if (!plan.ok) return plan;

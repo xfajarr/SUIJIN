@@ -4,11 +4,13 @@ import {
   DEPLOYMENT,
   GRPC_URL,
   addressBalance,
+  balanceKey,
   buildQuotes,
-  getAllowance,
+  freshAllowances,
+  freshStrategies,
   listStrategies,
-  typesOf,
-  type AllowanceState,
+  resolveCoin,
+  sameType,
 } from '@suijin/sdk';
 import { fillOrder } from './executor';
 
@@ -32,22 +34,37 @@ const json = (body: unknown, status = 200) =>
   });
 const preflight = () => new Response(null, { headers: cors });
 
-async function quotes(quoteIn: bigint) {
-  const strategies = await listStrategies();
-  const makers = [...new Set(strategies.map((s) => s.maker))];
-  const allowanceIds = [...new Set(strategies.map((s) => s.makerAllowanceId))];
+type QuoteRequest = { buy: string; sell: string } & ({ quoteIn: bigint } | { baseOut: bigint });
+
+/** Quotes for a trader who pays `sell` and receives `buy`, exact input or exact output. */
+async function quotes(req: QuoteRequest) {
+  // GraphQL finds the strategies; their state is then re-read from the fullnode, because a quote
+  // priced on a lagging index can fail at settlement.
+  const listed = (await listStrategies()).filter((s) => sameType(s.baseType, req.buy) && sameType(s.quoteType, req.sell));
+  const strategies = await freshStrategies(client, listed.map((s) => s.id));
+  const holders = [...new Map(strategies.map((s) => [balanceKey(s.maker, s.baseType), s] as const)).values()];
   const [balances, allowances] = await Promise.all([
-    Promise.all(makers.map(async (m) => [m, await addressBalance(client, m, typesOf().base)] as const)),
-    Promise.all(allowanceIds.map(async (id) => [id, await getAllowance(id)] as const)),
+    Promise.all(holders.map(async (s) => [balanceKey(s.maker, s.baseType), await addressBalance(client, s.maker, s.baseType)] as const)),
+    freshAllowances(client, [...new Set(strategies.map((s) => s.makerAllowanceId))]),
   ]);
-  const live = allowances.filter((entry): entry is readonly [string, AllowanceState] => entry[1] !== null);
-  return buildQuotes({
-    strategies,
-    makerBalances: new Map(balances),
-    allowances: new Map(live),
-    quoteIn,
-    nowMs: Date.now(),
-  });
+  const common = { strategies, makerBalances: new Map(balances), allowances, base: req.buy, quote: req.sell, nowMs: Date.now() };
+  return 'quoteIn' in req ? buildQuotes({ ...common, quoteIn: req.quoteIn }) : buildQuotes({ ...common, baseOut: req.baseOut });
+}
+
+/**
+ * Body: { sell: 'tUSD' | coin type, buy: 'tJPY' | coin type, amountIn | amountOut: integer string }.
+ * The original { quoteIn } body still means "pay tUSD, receive tJPY".
+ */
+function parseQuoteRequest(body: Record<string, unknown>): QuoteRequest | string {
+  const sell = resolveCoin(String(body.sell ?? 'tUSD'));
+  const buy = resolveCoin(String(body.buy ?? 'tJPY'));
+  if (!sell || !buy || sell.type === buy.type) return 'sell and buy must be two different coins (tUSD, tJPY)';
+  const amountIn = body.amountIn ?? body.quoteIn;
+  const amountOut = body.amountOut;
+  const isInt = (v: unknown) => typeof v === 'string' && /^[1-9]\d*$/.test(v);
+  if (isInt(amountIn) && amountOut === undefined) return { sell: sell.type, buy: buy.type, quoteIn: BigInt(amountIn as string) };
+  if (isInt(amountOut) && amountIn === undefined) return { sell: sell.type, buy: buy.type, baseOut: BigInt(amountOut as string) };
+  return 'send exactly one of amountIn or amountOut as a positive integer string';
 }
 
 const server = Bun.serve({
@@ -58,9 +75,9 @@ const server = Bun.serve({
     '/v1/quote': {
       OPTIONS: preflight,
       POST: async (req) => {
-        const body = (await req.json()) as { quoteIn?: string };
-        if (!body.quoteIn || !/^\d+$/.test(body.quoteIn)) return json({ error: 'quoteIn must be an integer string' }, 400);
-        return json(await quotes(BigInt(body.quoteIn)));
+        const parsed = parseQuoteRequest((await req.json()) as Record<string, unknown>);
+        if (typeof parsed === 'string') return json({ error: parsed }, 400);
+        return json(await quotes(parsed));
       },
     },
     '/v1/orders/:id/fill': {
