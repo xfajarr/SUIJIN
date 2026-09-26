@@ -17,8 +17,8 @@
 .chip-btn:hover { background: var(--accent-soft); color: var(--accent); }
 .kv.receive { padding-top: 12px; border-top: 1px solid var(--line); font-size: 14px; }
 
-/* live preview beside the form */
-.preview { position: sticky; top: 20px; }
+/* live preview beside the form (clears the sticky header) */
+.preview { position: sticky; top: 92px; }
 .preview-side { display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 13px; animation: rise 0.35s var(--ease) both; }
 .preview-side .big { font-family: inherit; font-weight: 700; font-size: 26px; letter-spacing: -0.02em; }
 .preview-side .big .unit { font-size: 14px; font-weight: 600; color: var(--muted); }

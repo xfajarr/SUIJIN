@@ -39,8 +39,9 @@ a { color: var(--accent); }
 a:hover { color: var(--ink); }
 
 /* ---------- shell ---------- */
-.app { max-width: 1120px; margin: 0 auto; padding: 20px 16px 72px; display: flex; flex-direction: column; gap: 28px; }
-.topbar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; }
+.app { max-width: 1120px; margin: 0 auto; padding: 12px 16px 72px; display: flex; flex-direction: column; gap: 28px; }
+.topbar { position: sticky; top: 0; z-index: 40; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; padding: 14px 28px; border-bottom: 1px solid transparent; transition: background-color 0.25s var(--ease), border-color 0.25s var(--ease); }
+.topbar.scrolled { background: rgba(2, 8, 7, 0.78); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom-color: var(--line); }
 .topbar-actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; white-space: nowrap; }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; justify-self: start; }
 .brand img { width: 40px; height: 40px; mix-blend-mode: screen; }
@@ -60,7 +61,7 @@ a:hover { color: var(--ink); }
 .footnote { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; color: var(--faint); }
 .status { display: inline-flex; align-items: center; gap: 6px; }
 @media (max-width: 860px) {
-  .topbar { grid-template-columns: 1fr auto; }
+  .topbar { grid-template-columns: 1fr auto; padding: 12px 16px; row-gap: 12px; }
   .nav { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; min-width: 0; justify-content: space-between; overflow-x: auto; scrollbar-width: none; }
 }
 @media (max-width: 480px) {

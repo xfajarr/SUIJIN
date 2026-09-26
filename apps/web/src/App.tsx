@@ -31,25 +31,41 @@ export function App() {
   const page = PAGES.find((p) => p.path === path) ?? PAGES[0]!;
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <a className="brand" href="https://suijin.xfajarr-web3.workers.dev" aria-label="Suijin home">
-          <img src="/logo.png" alt="" />
-          <span>Suijin</span>
-        </a>
-        <Nav current={page.path} />
-        <div className="topbar-actions">
-          <Faucet />
-          <ConnectButton />
-        </div>
-      </header>
-      <main key={page.path}>
-        <page.Page />
-      </main>
-      <Status />
+    <>
+      <Header current={page.path} />
+      <div className="app">
+        <main key={page.path}>
+          <page.Page />
+        </main>
+        <Status />
+      </div>
       <ConnectModal ref={connectModal as never} />
       <Toasts />
-    </div>
+    </>
+  );
+}
+
+/** Full width and transparent at the top; once the page scrolls it stays pinned with a backdrop. */
+function Header({ current }: { current: string }) {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 4);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+  return (
+    <header className={`topbar${scrolled ? ' scrolled' : ''}`}>
+      <a className="brand" href="https://suijin.xfajarr-web3.workers.dev" aria-label="Suijin home">
+        <img src="/logo.png" alt="" />
+        <span>Suijin</span>
+      </a>
+      <Nav current={current} />
+      <div className="topbar-actions">
+        <Faucet />
+        <ConnectButton />
+      </div>
+    </header>
   );
 }
 
