@@ -183,7 +183,7 @@ contracts/suijin/      Move: app (Allowance binding), math, strategy, order, set
 contracts/mock_coins/  Move: tUSD and tJPY test coins with open faucets
 packages/sdk/          TypeScript: transaction builders, chain reads, math mirror, quote engine
 apps/server/           Bun: POST /v1/quote (resolver) and POST /v1/orders/:id/fill (executor)
-apps/web/              reserved for the dApp workspace (package manifest only)
+apps/web/              web app (frontend team), talks to apps/server and @suijin/sdk
 scripts/               deploy.ts, e2e.ts (live proof), smoke-server.ts (live HTTP test)
 docs/superpowers/plans implementation plan with every design decision
 ```
