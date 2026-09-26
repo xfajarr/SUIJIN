@@ -1,0 +1,8 @@
+{
+  // The public API (quotes + executor). Deploy from apps/server with `bunx wrangler deploy`;
+  // set the key once with `bunx wrangler secret put EXECUTOR_SECRET_KEY`.
+  "name": "suijin-api",
+  "main": "src/worker.ts",
+  "compatibility_date": "2025-09-02",
+  "observability": { "enabled": true }
+}
