@@ -92,7 +92,7 @@ h3 { margin: 0; font-size: 16px; font-weight: 600; }
 
 /* ---------- controls ---------- */
 button { font: inherit; font-weight: 600; cursor: pointer; }
-.btn { padding: 9px 16px; border-radius: 999px; border: 1px solid var(--accent); background: transparent; color: var(--accent); transition: background-color 0.18s var(--ease), color 0.18s var(--ease), transform 0.12s var(--ease), opacity 0.18s; }
+.btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; padding: 9px 16px; border-radius: 999px; border: 1px solid var(--accent); background: transparent; color: var(--accent); transition: background-color 0.18s var(--ease), color 0.18s var(--ease), transform 0.12s var(--ease), opacity 0.18s; }
 .btn:hover:not(:disabled) { background: var(--accent); color: var(--accent-ink); }
 .btn:active:not(:disabled) { transform: scale(0.97); }
 .btn.ghost { border-color: var(--line-strong); color: var(--ink); }
@@ -101,10 +101,10 @@ button { font: inherit; font-weight: 600; cursor: pointer; }
 .btn.danger:hover:not(:disabled) { background: var(--danger); color: #1d0503; }
 .btn.sm { padding: 5px 12px; font-size: 13px; }
 .btn:disabled { opacity: 0.45; cursor: default; }
-.cta { width: 100%; padding: 15px 18px; border-radius: 16px; border: 0; background: var(--accent); color: var(--accent-ink); font-size: 16px; transition: background-color 0.2s var(--ease), transform 0.12s var(--ease), box-shadow 0.2s var(--ease); box-shadow: 0 8px 30px -12px rgba(43, 196, 180, 0.7); }
+.cta { display: block; text-align: center; text-decoration: none; font-weight: 700; width: 100%; padding: 17px 18px; border-radius: 16px; border: 0; background: var(--accent); color: var(--accent-ink); font-size: 17px; transition: background-color 0.2s var(--ease), transform 0.12s var(--ease); }
 .cta:hover:not(:disabled) { background: #3fd6c6; }
 .cta:active:not(:disabled) { transform: scale(0.985); }
-.cta:disabled { background: rgba(232, 251, 247, 0.08); color: var(--faint); box-shadow: none; cursor: default; }
+.cta:disabled { background: rgba(232, 251, 247, 0.08); color: var(--faint); cursor: default; }
 .cta.warn:disabled { color: var(--danger); background: var(--danger-soft); }
 button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
@@ -142,8 +142,8 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; 
 .token-btn { color: var(--ink); cursor: pointer; transition: background-color 0.18s var(--ease), border-color 0.18s var(--ease); }
 .token-btn:hover { background: rgba(232, 251, 247, 0.13); border-color: var(--line-strong); }
 .token-btn svg { color: var(--muted); }
-.max { border: 0; background: var(--accent-soft); color: var(--accent); font-size: 12px; padding: 3px 8px; border-radius: 999px; }
-.max:hover { background: var(--accent); color: var(--accent-ink); }
+.max { border: 0; background: none; color: var(--accent); font-size: 12px; padding: 0; }
+.max:hover { color: var(--ink); }
 .flip-wrap { display: flex; justify-content: center; height: 0; position: relative; z-index: 1; }
 .flip { position: relative; top: -22px; width: 44px; height: 44px; border-radius: 14px; border: 4px solid #041412; background: var(--solid); color: var(--accent); display: grid; place-items: center; transition: transform 0.35s var(--ease), background-color 0.18s; }
 .flip:hover { background: #0a2a26; }
@@ -227,7 +227,7 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; 
 .details-body { padding-top: 6px; gap: 8px; animation: rise 0.25s var(--ease) both; }
 .route-item { font: inherit; font-weight: 400; color: var(--ink); width: 100%; text-align: left; transition: border-color 0.18s var(--ease), background-color 0.18s var(--ease); }
 .route-item:hover { border-color: var(--line-strong); }
-.link-btn { align-self: flex-start; border: 0; background: transparent; color: var(--accent); padding: 2px 0; font-size: 13px; }
+.link-btn { align-self: flex-start; border: 0; background: transparent; color: var(--accent); padding: 2px 0; font-size: 13px; font-weight: 600; text-decoration: none; }
 .link-btn:hover { color: var(--ink); }
 .receipt h2.receipt-title { font-size: 20px; letter-spacing: 0; text-transform: none; color: var(--ink); }
 .receipt-body { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 18px; }
