@@ -514,7 +514,9 @@ function Preview({ plan, P, shape, feeBps, depth, expiresAtMs, now }: { plan: Si
         const sellsJpy = s.coin === 'tJPY';
         const trade =
           Pn === null ? '—' : sellsJpy ? `1 tUSD → ${num(Pn * (1 - fee))} tJPY` : `${num(shape === 'curve' ? Pn / (1 - fee) : Pn * (1 + fee))} tJPY → 1 tUSD`;
-        const last = Pn === null ? '—' : move === null ? 'No limit' : `1 tUSD = ${num(sellsJpy ? Pn / move : Pn * move)} tJPY`;
+        // Trader price now (after fee) and once the budget is sold, in tJPY per tUSD.
+        const start = Pn === null ? null : sellsJpy ? Pn * (1 - fee) : Pn / (1 - fee);
+        const end = start === null || move === null ? null : sellsJpy ? start / move : start * move;
         const shared = s.budget && s.amount ? budgetRatio(s.budget, s.balance, now, s.amount) : null;
         return (
           <div className="preview-side" key={s.coin}>
@@ -535,10 +537,25 @@ function Preview({ plan, P, shape, feeBps, depth, expiresAtMs, now }: { plan: Si
               <span>Trader price</span>
               <span>{trade}</span>
             </div>
-            {shape === 'curve' && (
-              <div className="kv">
-                <span>Price when sold out</span>
-                <span>{last}</span>
+            {shape === 'curve' && start !== null && (
+              <div className="range">
+                <div className="spread small">
+                  <span className="muted">Price range</span>
+                  <span className="faint">tJPY per tUSD</span>
+                </div>
+                <div className={`range-track${end === null ? ' open' : ''}`} aria-hidden="true" />
+                <div className="spread small">
+                  <span>
+                    <b className="num">{num(start)}</b> <span className="faint">now</span>
+                  </span>
+                  <span>
+                    {end === null ? <span className="faint">never sells out</span> : (
+                      <>
+                        <b className="num">{num(end)}</b> <span className="faint">sold out</span>
+                      </>
+                    )}
+                  </span>
+                </div>
               </div>
             )}
             <div className="kv">

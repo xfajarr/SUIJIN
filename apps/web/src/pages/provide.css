@@ -22,6 +22,11 @@
 .preview-side { display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 13px; animation: rise 0.35s var(--ease) both; }
 .preview-side .big { font-family: inherit; font-weight: 700; font-size: 26px; letter-spacing: -0.02em; }
 .preview-side .big .unit { font-size: 14px; font-weight: 600; color: var(--muted); }
+
+/* curve price range in the preview: now (teal) to sold out (gold) */
+.range { display: flex; flex-direction: column; gap: 6px; padding: 4px 0; }
+.range-track { height: 6px; border-radius: 999px; background: linear-gradient(90deg, var(--accent), var(--gold)); }
+.range-track.open { background: linear-gradient(90deg, var(--accent), rgba(244, 182, 60, 0.3) 75%, transparent); }
 .checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--muted); }
 .checks li { display: grid; grid-template-columns: 16px 1fr; gap: 8px; align-items: start; }
 .checks svg { color: var(--accent); margin-top: 2px; }
