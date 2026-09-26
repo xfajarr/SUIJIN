@@ -155,8 +155,9 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; 
 .max { border: 0; background: none; color: var(--accent); font-size: 12px; padding: 0; }
 .max:hover { color: var(--ink); }
 .flip-wrap { display: flex; justify-content: center; height: 0; position: relative; z-index: 1; }
-.flip { position: relative; top: -22px; width: 44px; height: 44px; border-radius: 14px; border: 4px solid #041412; background: var(--solid); color: var(--accent); display: grid; place-items: center; transition: transform 0.35s var(--ease), background-color 0.18s; }
-.flip:hover { background: #0a2a26; }
+/* A small disc that cuts into both panels: its ring is the card's own colour. */
+.flip { position: relative; top: -15px; width: 30px; height: 30px; border-radius: 50%; border: 0; background: var(--trade-bg, var(--solid)); color: var(--muted); display: grid; place-items: center; box-shadow: 0 0 0 4px var(--trade-bg, var(--solid)), inset 0 0 0 1px var(--line-strong); transition: transform 0.35s var(--ease), color 0.18s var(--ease); }
+.flip:hover { color: var(--accent); }
 .flip.turned { transform: rotate(180deg); }
 .flip:disabled { opacity: 0.5; cursor: default; }
 
@@ -254,12 +255,15 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; 
 
 /* ---------- swap and pay ---------- */
 .card-title { margin: 0; font-size: 18px; font-weight: 600; }
+.trade-card { --trade-bg: #071614; background: var(--trade-bg); backdrop-filter: none; -webkit-backdrop-filter: none; border-radius: 24px; padding: 14px; gap: 10px; }
+.trade-card .card-head { padding: 0 0 4px 2px; }
+.mode { margin: 0; padding: 7px 14px; border-radius: 12px; background: rgba(43, 196, 180, 0.12); color: var(--accent); font-size: 15px; font-weight: 700; }
 .icon-btn { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; border: 0; background: transparent; color: var(--muted); transition: background-color 0.18s var(--ease), color 0.18s var(--ease), transform 0.35s var(--ease); }
 .icon-btn:hover { color: var(--ink); background: rgba(232, 251, 247, 0.08); }
 .icon-btn[aria-expanded='true'] { color: var(--accent); background: var(--accent-soft); }
 .settings { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); animation: rise 0.25s var(--ease) both; }
 .settings .hint { margin: 0; }
-.pair { display: flex; flex-direction: column; gap: 6px; transition: opacity 0.3s var(--ease); }
+.pair { display: flex; flex-direction: column; gap: 4px; transition: opacity 0.3s var(--ease); }
 .pair.locked { opacity: 0.6; pointer-events: none; }
 .rate-line { border: 0; background: transparent; color: var(--muted); padding: 0; font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; }
 .rate-line:hover { color: var(--ink); }

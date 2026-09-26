@@ -73,9 +73,9 @@ export function Swap() {
 
   return (
     <div className="center page">
-      <section className="card swap-card" aria-busy={live.loading}>
+      <section className="card trade-card" aria-busy={live.loading}>
         <div className="card-head">
-          <h1 className="card-title">Swap</h1>
+          <h1 className="mode">Swap</h1>
           <div className="inline">
             {quote && idle && <RefreshRing updatedAt={live.updatedAt} ms={REFRESH_MS} onClick={live.refresh} />}
             <button
@@ -99,7 +99,7 @@ export function Swap() {
 
         <div className={`pair${idle ? '' : ' locked'}`}>
           <AmountPanel
-            label="You pay"
+            label="Sell"
             coin={sell}
             value={side === 'in' ? text : quote ? fmt(quote.quoteIn) : ''}
             onChange={idle ? type('in') : undefined}
@@ -116,8 +116,9 @@ export function Swap() {
             </button>
           </div>
           <AmountPanel
-            label="You receive"
+            label="Buy"
             coin={buy}
+            outline
             value={side === 'out' ? text : quote ? fmt(quote.baseOut) : ''}
             onChange={idle ? type('out') : undefined}
             onCoin={idle ? flip : undefined}
@@ -129,7 +130,6 @@ export function Swap() {
         {amount && (
           <div className="spread small">
             <RateLine quote={quote} sell={sell} buy={buy} loading={live.loading} />
-            {quote && <span className="chip">{quote.kind === 'curve' ? 'Curve' : 'Fixed price'}</span>}
           </div>
         )}
 
