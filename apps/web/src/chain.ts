@@ -364,7 +364,8 @@ export type RunResult = { digest: string; created: (...typeFragments: string[]) 
 
 /**
  * Signs with the wallet, waits for effects, then refreshes every poll.
- * `created('::order::SwapOrder<')` returns the id of a new object whose type contains every fragment.
+ * `created('::order::SwapOrder<')` returns the id of a new object whose type contains every fragment
+ * (addresses compared padded, so `0x2::sui::SUI` matches however the node spells it).
  */
 export function useRun() {
   const dAppKit = useDAppKit();
@@ -380,7 +381,7 @@ export function useRun() {
       return {
         digest: done.Transaction.digest,
         created: (...fragments) =>
-          effects.changedObjects.find((c) => c.idOperation === 'Created' && fragments.every((f) => objectTypes[c.objectId]?.includes(f)))?.objectId ?? '',
+          effects.changedObjects.find((c) => c.idOperation === 'Created' && fragments.every((f) => normalizeType(objectTypes[c.objectId] ?? '').includes(normalizeType(f))))?.objectId ?? '',
       };
     },
     [dAppKit, client],
