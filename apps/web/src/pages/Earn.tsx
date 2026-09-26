@@ -2,7 +2,7 @@ import { useCurrentAccount } from '@mysten/dapp-kit-react';
 import { BPS, createStrategies, issueAllowances, type CoinKey, type StrategySpec } from '@suijin/sdk';
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { COINS, explorer, friendlyError, openConnect, other, toast, useBalances, useNow, usePositions, useQuotes, useRun, type Budget } from '../chain';
-import { AmountPanel, Check, CoinIcon, Segmented, Skeleton, Steps, TxLink, cleanAmount, fmt, parseAmount, toInput, type StepState } from '../ui';
+import { AmountPanel, Check, CoinIcon, Options, Segmented, Skeleton, Steps, TxLink, cleanAmount, fmt, parseAmount, toInput, type StepState } from '../ui';
 import { budgetRatio } from './Portfolio';
 import './provide.css';
 
@@ -234,24 +234,61 @@ export function PriceField(p: { label: string; value: string | null; onChange: (
 // ---------- page ----------
 
 type Sides = 'both' | CoinKey;
-const SIDES: { value: Sides; label: string }[] = [
-  { value: 'both', label: 'Both sides' },
-  { value: 'tJPY', label: 'Sell tJPY' },
-  { value: 'tUSD', label: 'Sell tUSD' },
+const SIDES: { value: Sides; label: ReactNode }[] = [
+  {
+    value: 'both',
+    label: (
+      <span className="side-label">
+        <span className="coin-pair">
+          <CoinIcon coin="tJPY" size={16} />
+          <CoinIcon coin="tUSD" size={16} />
+        </span>
+        Both sides
+      </span>
+    ),
+  },
+  {
+    value: 'tJPY',
+    label: (
+      <span className="side-label">
+        <CoinIcon coin="tJPY" size={16} />
+        Sell tJPY
+      </span>
+    ),
+  },
+  {
+    value: 'tUSD',
+    label: (
+      <span className="side-label">
+        <CoinIcon coin="tUSD" size={16} />
+        Sell tUSD
+      </span>
+    ),
+  },
 ];
-const SHAPES: { value: Shape; label: string }[] = [
-  { value: 'curve', label: 'Curve' },
-  { value: 'fixed', label: 'Fixed price' },
+const CurveIcon = () => (
+  <svg width="46" height="22" viewBox="0 0 46 22" fill="none" aria-hidden="true">
+    <path d="M3 2.5C7 13 16 18.5 43 19.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+const FlatIcon = () => (
+  <svg width="46" height="22" viewBox="0 0 46 22" fill="none" aria-hidden="true">
+    <path d="M3 11h40" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+const SHAPES: { value: Shape; title: string; caption: string; icon: ReactNode }[] = [
+  { value: 'curve', title: 'Curve', caption: 'Price moves with each fill', icon: <CurveIcon /> },
+  { value: 'fixed', title: 'Fixed price', caption: 'One price for every fill', icon: <FlatIcon /> },
 ];
 const FEES = [
-  { value: 5, label: '0.05%' },
-  { value: 30, label: '0.30%' },
-  { value: 100, label: '1.00%' },
+  { value: 5, title: '0.05%', caption: 'Stable pairs' },
+  { value: 30, title: '0.30%', caption: 'Most pairs' },
+  { value: 100, title: '1.00%', caption: 'Volatile pairs' },
 ];
 const DEPTHS = [
-  { value: 1, label: 'Full range' },
-  { value: 2, label: 'Wide' },
-  { value: 5, label: 'Concentrated' },
+  { value: 1, title: 'Full range', caption: 'Never sells out' },
+  { value: 2, title: 'Wide', caption: '2× depth' },
+  { value: 5, title: 'Concentrated', caption: '5× depth' },
 ];
 const DURATIONS = [
   { value: 1, label: '1 h' },
@@ -363,8 +400,7 @@ export function Earn() {
               </div>
               <div className="fieldset">
                 <span>Shape</span>
-                <Segmented label="Shape" full value={shape} options={SHAPES} onChange={setShape} />
-                <span className="hint">{shape === 'curve' ? 'The price moves with each fill, like an AMM pool.' : 'One price for every fill, like a standing order.'}</span>
+                <Options label="Shape" value={shape} options={SHAPES} onChange={setShape} />
               </div>
               <PriceField
                 label="Price"
@@ -373,7 +409,7 @@ export function Earn() {
                 invalid={price !== null && price !== '' && (!P || P <= 0n)}
                 chips={
                   market.mid !== null && (
-                    <button type="button" className="chip chip-btn" onClick={() => setPrice(priceText(market.mid!))}>
+                    <button type="button" className="chip-btn" onClick={() => setPrice(priceText(market.mid!))}>
                       Market
                     </button>
                   )
@@ -382,12 +418,12 @@ export function Earn() {
               />
               <div className="fieldset">
                 <span>{shape === 'curve' ? 'Fee tier' : 'Spread'}</span>
-                <Segmented label={shape === 'curve' ? 'Fee tier' : 'Spread'} full value={feeBps} options={FEES} onChange={setFeeBps} />
+                <Options label={shape === 'curve' ? 'Fee tier' : 'Spread'} value={feeBps} options={FEES} onChange={setFeeBps} />
               </div>
               {shape === 'curve' && (
                 <div className="fieldset">
                   <span>Depth</span>
-                  <Segmented label="Depth" full value={depth} options={DEPTHS} onChange={setDepth} />
+                  <Options label="Depth" value={depth} options={DEPTHS} onChange={setDepth} />
                   <span className="hint">
                     {depth === 1
                       ? 'Spread over every price. It never fully sells out.'
@@ -467,7 +503,7 @@ function Preview({ plan, P, shape, feeBps, depth, expiresAtMs, now }: { plan: Si
   const fee = feeBps / 10_000;
   // Price multiple once the whole budget is sold: (m / (m - 1))² on a curve with m× virtual depth.
   const move = depth > 1 ? (depth / (depth - 1)) ** 2 : null;
-  const feeLabel = FEES.find((f) => f.value === feeBps)?.label;
+  const feeLabel = FEES.find((f) => f.value === feeBps)?.title;
   return (
     <aside className="card preview" aria-label="Preview">
       <div className="card-head">
