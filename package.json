@@ -11,6 +11,7 @@
     "e2e": "bun scripts/e2e.ts",
     "smoke": "bun scripts/smoke-server.ts",
     "smoke:defi": "bun scripts/smoke-defi.ts",
+    "smoke:tokens": "bun scripts/smoke-tokens.ts",
     "server": "bun apps/server/src/index.ts",
     "web": "cd apps/web && bunx vite"
   },
