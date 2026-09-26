@@ -1,23 +1,32 @@
 import { useCurrentAccount } from '@mysten/dapp-kit-react';
 import { isValidSuiAddress } from '@mysten/sui/utils';
-import type { CoinKey } from '@suijin/sdk';
-import { useState } from 'react';
-import { COIN_KEYS, openConnect, other, toast, useBalances, useQuotes } from '../chain';
-import { AmountPanel, CoinIcon, Segmented, cleanAmount, fmt, fmtCoin, parseAmount, short, toInput } from '../ui';
-import { FlowProgress, QuoteDetails, Receipt, RefreshRing, SlippageSettings, Sliders, TradeTabs, settledLine, useOrderFlow } from './trade';
+import { fetchCoinInfo, sameType, tokensOf, type CoinKey } from '@suijin/sdk';
+import { useEffect, useState } from 'react';
+import { addToken, coin as tokenInfo, openConnect, toast, tokens, useBalances, useQuotes } from '../chain';
+import { AmountPanel, TokenPicker, cleanAmount, fmtAmt, fmtCoin, parseAmount, short, toInput } from '../ui';
+import { BalanceHint, FlowProgress, QuoteDetails, Receipt, RefreshRing, SlippageSettings, Sliders, TradeTabs, settledLine, useOrderFlow } from './trade';
 
 const REFRESH_MS = 15_000;
 
-/** Payment request links: '#/pay?to=0x…&amount=1500&coin=tJPY'. */
+/** Payment request links: '#/pay?to=0x…&amount=1500&coin=tJPY'. `coin` is a listed symbol or a full coin type. */
 function requestParams() {
   const q = new URLSearchParams(location.hash.split('?')[1] ?? '');
-  const coin = q.get('coin');
-  return {
-    to: q.get('to') ?? '',
-    amount: cleanAmount(q.get('amount') ?? ''),
-    coin: (COIN_KEYS as string[]).includes(coin ?? '') ? (coin as CoinKey) : 'tJPY',
-  };
+  const param = q.get('coin') ?? 'tJPY';
+  const known = tokens().find((t) => t.key === param || sameType(t.type, param));
+  return { to: q.get('to') ?? '', amount: q.get('amount') ?? '', coin: known?.key ?? 'tJPY', unknownType: known ? null : param };
 }
+
+/** A link's coin this browser has not listed yet: looks it up by type and adds it. */
+function useLinkedToken(type: string | null, onFound: (key: CoinKey) => void) {
+  useEffect(() => {
+    if (!type || !type.includes('::')) return;
+    fetchCoinInfo(type).then((info) => info && onFound(addToken(info).key), () => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type]);
+}
+
+/** What goes in a link: the symbol for built-in tokens, the full type for ones added by hand. */
+const linkCoin = (key: CoinKey) => (tokensOf().some((t) => t.key === key) ? key : tokenInfo(key).type);
 
 export function Pay() {
   const me = useCurrentAccount()?.address ?? '';
@@ -27,18 +36,29 @@ export function Pay() {
   const [to, setTo] = useState(request.to);
   const [text, setText] = useState(request.amount);
   const [coin, setCoin] = useState<CoinKey>(request.coin);
-  const payWith = other(coin);
+  const [payWith, setPayWith] = useState<CoinKey>(request.coin === 'tUSD' ? 'tJPY' : 'tUSD');
+  useLinkedToken(request.unknownType, setCoin);
+  const pickCoin = (k: CoinKey) => {
+    if (k === payWith) setPayWith(coin);
+    setCoin(k);
+    setPicked(null);
+  };
+  const pickPayWith = (k: CoinKey) => {
+    if (k === coin) setCoin(payWith);
+    setPayWith(k);
+    setPicked(null);
+  };
   const [slippageBps, setSlippageBps] = useState(50);
   const [settings, setSettings] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
 
   const recipient = to.trim().toLowerCase();
   const validTo = isValidSuiAddress(recipient) && recipient.length === 66;
-  const amount = parseAmount(text);
+  const amount = parseAmount(text, tokenInfo(coin).decimals);
   const idle = flow.step === 'idle';
   const live = useQuotes(idle && amount ? { sell: payWith, buy: coin, amountOut: amount, slippageBps } : null, REFRESH_MS);
   const quote = idle ? (live.quotes.find((q) => q.strategyId === picked) ?? live.best) : (flow.quote ?? null);
-  const balance = balances.value?.[payWith] ?? null;
+  const balance = balances.value?.address[payWith] ?? null;
   const tooMuch = !!me && !!quote && balance !== null && quote.quoteIn > balance;
 
   const cta = (() => {
@@ -49,7 +69,7 @@ export function Pay() {
     if (live.error) return { label: 'Quotes unavailable', warn: true };
     if (!quote) return { label: 'Not enough liquidity for this amount', warn: true };
     if (tooMuch) return { label: `Not enough ${payWith}`, warn: true };
-    if (balances.value?.sui === 0n) return { label: 'Need testnet SUI for gas', warn: true };
+    if (balances.value?.gas === 0n) return { label: 'Need testnet SUI for gas', warn: true };
     return { label: `Pay ${fmtCoin(amount, coin)}`, onClick: () => flow.execute(quote, recipient) };
   })();
 
@@ -73,10 +93,10 @@ export function Pay() {
       {request.to && idle && (
         <p className="banner" role="note">
           Payment request from <span className="mono">{short(request.to)}</span>
-          {parseAmount(request.amount) && (
+          {parseAmount(request.amount, tokenInfo(coin).decimals) && (
             <>
               {' '}
-              for <b>{fmtCoin(parseAmount(request.amount)!, request.coin)}</b>
+              for <b>{fmtCoin(parseAmount(request.amount, tokenInfo(coin).decimals)!, coin)}</b>
             </>
           )}
         </p>
@@ -124,13 +144,17 @@ export function Pay() {
                   }
                 : undefined
             }
-            onCoin={idle ? () => setCoin(payWith) : undefined}
+            onPick={idle ? pickCoin : undefined}
+            balances={balances.value?.address}
           />
           <AmountPanel
             label="You pay"
             coin={payWith}
             outline
-            value={quote ? fmt(quote.quoteIn) : ''}
+            value={quote ? fmtAmt(quote.quoteIn, payWith) : ''}
+            onPick={idle ? pickPayWith : undefined}
+            exclude={coin}
+            balances={balances.value?.address}
             balance={me ? balance : undefined}
             loading={live.loading}
             invalid={tooMuch}
@@ -156,9 +180,10 @@ export function Pay() {
             <button type="button" className={`cta${cta.warn ? ' warn' : ''}`} disabled={!cta.onClick} onClick={cta.onClick}>
               {cta.label}
             </button>
+            <BalanceHint coin={payWith} balances={balances.value} me={me} />
           </>
         ) : (
-          <FlowProgress flow={flow} payLabel={quote ? `${toInput(quote.quoteIn)} ${payWith}` : payWith} />
+          <FlowProgress flow={flow} payLabel={quote ? `${toInput(quote.quoteIn, tokenInfo(payWith).decimals)} ${payWith}` : payWith} />
         )}
       </section>
 
@@ -171,8 +196,9 @@ export function Pay() {
 function RequestLink({ me }: { me: string }) {
   const [text, setText] = useState('');
   const [coin, setCoin] = useState<CoinKey>('tJPY');
-  const amount = parseAmount(text);
-  const link = `${location.origin}${location.pathname}#/pay?to=${me}&coin=${coin}${amount ? `&amount=${toInput(amount)}` : ''}`;
+  const { decimals } = tokenInfo(coin);
+  const amount = parseAmount(text, decimals);
+  const link = `${location.origin}${location.pathname}#/pay?to=${me}&coin=${encodeURIComponent(linkCoin(coin))}${amount ? `&amount=${toInput(amount, decimals)}` : ''}`;
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(link);
@@ -185,23 +211,10 @@ function RequestLink({ me }: { me: string }) {
     <section className="card request">
       <div className="card-head">
         <h2>Request a payment</h2>
-        <Segmented
-          label="Currency to receive"
-          value={coin}
-          onChange={setCoin}
-          options={COIN_KEYS.map((c) => ({
-            value: c,
-            label: (
-              <span className="inline" style={{ gap: 6 }}>
-                <CoinIcon coin={c} size={16} />
-                {c}
-              </span>
-            ),
-          }))}
-        />
+        <TokenPicker label="Currency to receive" value={coin} onPick={setCoin} />
       </div>
       <p className="small muted" style={{ margin: 0 }}>
-        The payer can hold either coin. They pay in theirs, you receive {coin}.
+        The payer can hold any token with a market into {coin}. They pay in theirs, you receive {coin}.
       </p>
       <div className="inline" style={{ flexWrap: 'nowrap' }}>
         <input
@@ -210,7 +223,7 @@ function RequestLink({ me }: { me: string }) {
           placeholder={`Amount in ${coin} (optional)`}
           aria-label={`Amount in ${coin}`}
           value={text}
-          onChange={(e) => setText(cleanAmount(e.target.value))}
+          onChange={(e) => setText(cleanAmount(e.target.value, decimals))}
         />
         <button type="button" className="btn" onClick={copy} style={{ whiteSpace: 'nowrap' }}>
           Copy link
