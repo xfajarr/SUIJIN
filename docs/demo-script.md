@@ -1,41 +1,66 @@
-# Suijin video script (≈4:00, Sui track)
+# Suijin demo video (≈4:00, Sui track, two browsers)
 
-Three parts: what it is (0:45), how it works live (1:30), how it uses Sui (1:30). The Sui part is the longest because it is what the Sui judges score.
+Two people, two browsers side by side:
+- **Browser A = Aiko, the provider.** Earns by quoting from her wallet.
+- **Browser B = Ben, the trader.** Swaps against Aiko's market.
 
-**Before recording**
-- Wallet on testnet with SUI for gas, tUSD + tJPY from the Faucet button, a second address copied for Pay.
-- Tabs: deck (`docs/pitch.html`), app (suijin-app.pages.dev), Suiscan on a fill tx (e.g. `CFA8Hoqsg4iSztB7g3mzRtk96qAz8YkQ5ffvjPmELJR3`), GitHub `contracts/suijin/sources/app.move` and `settlement.move`.
+## Setup (before recording)
 
-## 1. What it is (0:00–0:45)
+1. Two browsers (e.g. Chrome and Brave), each with its **own** Sui wallet on **testnet**. Put them side by side.
+2. Both wallets need SUI for gas: faucet.sui.io.
+3. Open suijin-app.pages.dev in both, connect, press **Faucet** in both (tUSD + tJPY).
+4. Note Aiko's address ending (e.g. `…a1b2`): you will point at it on Ben's screen.
+5. Other tabs: the deck (`docs/pitch.html`), GitHub `contracts/suijin/sources/app.move` and `settlement.move`, Suiscan.
+6. Browser zoom 110–125%, 1080p recording. Cut the wallet-signing waits when editing.
 
-| Time | Screen | Say |
-|---|---|---|
-| 0:00–0:15 | Deck slide 1 | "This is Suijin: shared liquidity built on Sui. One wallet balance backs many markets at once, and your coins never leave your wallet until a trade settles." |
-| 0:15–0:30 | Slide 2 | "Today every venue wants its own deposit. Swap pools, limit orders, payment apps: one balance gets split four ways and each market only sees a quarter." |
-| 0:30–0:45 | Slide 3 | "Suijin replaces the deposit with a Sui Allowance: a permission with a cap and an expiry that only our contract can use. Every market quotes against your full balance, and nothing moves." |
+## Script
 
-## 2. How it works, live (0:45–2:15)
-
-| Time | Screen | Say |
-|---|---|---|
-| 0:45–1:15 | App → **Earn** | Pick the pair, *Use market*, enter amounts, *Grant & open*, sign twice. "As a provider I grant a budget, then open fixed-price markets on it. My balance didn't change: nothing was deposited." |
-| 1:15–1:40 | **Trade → Swap** | 10 tUSD, *Swap*, receipt. "A trader swaps 10 tUSD. The router picks the best market and the executor settles both sides in one transaction." |
-| 1:40–2:00 | **Trade → Pay** | Paste an address, 1,500 tJPY, *Pay*. "Pay: the merchant receives exactly 1,500 tJPY while I pay in tUSD. If the price moves too far, it just doesn't go through." |
-| 2:00–2:15 | **Portfolio** + token picker | Show the fill, *Revoke*; open the picker, paste a coin type. "Fills land against my budget, one click revokes it. And it works with any Sui coin: SUI, USDC, or any type you paste." |
-
-## 3. How it uses Sui (2:15–3:45)
+### 1. What it is (0:00–0:40), deck
 
 | Time | Screen | Say |
 |---|---|---|
-| 2:15–2:45 | Slide 6, then `app.move` on GitHub | "The core is **app-bound Allowances**, new in the Sui framework. We call `propose_for_app` with our `App` type, so the allowance can only be spent with a permit that our own module mints. Our executor holds the spender role, but it has no way to spend outside Suijin's rules." |
-| 2:45–3:05 | Suiscan: the fill tx, *Transaction Blocks / commands* view | "Settlement is one **programmable transaction block**: two allowance withdrawals, the provider's and the trader's, go into `settlement::fill`, and both sides get paid in the same transaction. Coins sit as **address balances**, not objects in a vault, and are delivered with `balance::send_funds`." |
-| 3:05–3:25 | `settlement.move` (the `fill` function) | "Inside `fill`, Move recomputes the price, checks the trader's minimum, and checks that both withdrawals match exactly. Markets and orders are **shared objects**, so any fill can be settled. If any check fails, the PTB reverts and nothing moves. The executor decides *when*, Move decides *what*." |
-| 3:25–3:45 | Slide 9 | "We also use the **Coin Registry** for token metadata, and read over **gRPC** so quotes match what Move recomputes. It's tested end to end on testnet: 26 Move tests, live fills across SUI with 9 decimals and tUSD with 6." |
+| 0:00–0:12 | Slide 1 | "This is Suijin: shared liquidity on Sui. One wallet balance backs many markets, and your coins never leave your wallet until a trade settles." |
+| 0:12–0:25 | Slide 2 | "Today every venue wants a deposit, so one balance gets split and each market only sees a piece of it." |
+| 0:25–0:40 | Slide 3 | "Suijin replaces the deposit with a Sui Allowance: a permission with a cap and an expiry that only our contract can use. Let me show it with two people." |
 
-## Close (3:45–4:00)
+### 2. Aiko earns, Browser A (0:40–1:35)
+
+| Time | Do | Say |
+|---|---|---|
+| 0:40–0:50 | **Portfolio**: show Balances | "This is Aiko. She holds 150,000 tJPY in her own wallet." |
+| 0:50–1:15 | **Earn**: pair tUSD / tJPY → **Sell tJPY** → **Fixed price** → *Use market* → press **+** twice → fee **0.05%** → sell up to **10,000 tJPY** → 24 h | "She offers tJPY at a fixed price, slightly better than the market, with a 0.05% fee. The preview shows exactly what she gets if it all sells." |
+| 1:15–1:35 | **Grant budget & open market**, sign twice → **Portfolio** | "Two signatures: one grants the allowance, one opens the market. Her balance is still 150,000: nothing was deposited. The budget is just a permission." |
+
+### 3. Ben swaps with Aiko, Browser B (1:35–2:25)
+
+| Time | Do | Say |
+|---|---|---|
+| 1:35–1:55 | **Swap**: sell **10 tUSD** → buy tJPY → open **"You get at least…"** → show **Route** | "This is Ben. He wants tJPY. Suijin quotes every market; the best one is from Aiko's address, `…a1b2`." (If hers isn't first, click her route.) |
+| 1:55–2:10 | **Swap**, sign once → receipt | "Ben signs one approval for exactly 10 tUSD. The executor settles both sides in one transaction." |
+| 2:10–2:25 | Click **Settlement ↗** | "On-chain: Ben paid 10 tUSD, got tJPY. Aiko's tJPY left her wallet and her tUSD arrived, in the same transaction." |
+
+### 4. Back to Aiko, Browser A (2:25–2:50)
+
+| Time | Do | Say |
+|---|---|---|
+| 2:25–2:40 | **Portfolio** → Markets / Activity | "Aiko sees the fill: tJPY sold, tUSD received, budget used. She never deposited anything." |
+| 2:40–2:50 | **Budgets → Revoke** | "One click and the permission is gone. Nothing to withdraw." |
+
+### 5. How it uses Sui (2:50–3:50)
 
 | Time | Screen | Say |
 |---|---|---|
-| 3:45–4:00 | Slide 11 | "Suijin: one balance, many markets, only possible with Sui Allowances and PTBs. Live on testnet, code on GitHub. Thanks!" |
+| 2:50–3:10 | `app.move` lines 68–78 | "The core is Sui's **app-bound Allowances**. Our executor is the spender, but a spend needs a permit only our module can mint, so it can only move funds through Suijin's rules." |
+| 3:10–3:30 | Suiscan: Ben's fill tx | "Settlement is one **PTB**: Aiko's and Ben's allowance withdrawals go into `settlement::fill`, and both sides are paid from **address balances** with `send_funds`. No vault, no pool." |
+| 3:30–3:50 | `settlement.move` from line 32 | "Move recomputes the price, checks Ben's minimum and the exact amounts. Any mismatch and the whole PTB reverts. The executor decides when, Move decides what." |
 
-**Tips:** 1080p, browser zoom 110–125%, cut wallet-signing waits, highlight the lines of Move you mention (select them before talking).
+### 6. Close (3:50–4:00)
+
+| Time | Screen | Say |
+|---|---|---|
+| 3:50–4:00 | Slide 11 | "Suijin: one balance, many markets, only possible with Sui Allowances and PTBs. Live on testnet. Thanks!" |
+
+## If something goes wrong
+- **Ben's best route isn't Aiko:** open the route list and click her market, or have Aiko press + one more time.
+- **"Need testnet SUI for gas":** faucet.sui.io for that wallet.
+- **Swap fails:** get a fresh quote and swap again; nothing moved.
