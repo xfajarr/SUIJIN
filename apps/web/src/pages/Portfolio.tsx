@@ -1,21 +1,29 @@
 import { useCurrentAccount } from '@mysten/dapp-kit-react';
-import { BPS, DEPLOYMENT, listFills, revokeAllowance, setStrategyActive, type FillEvent, type StrategyState } from '@suijin/sdk';
+import { BPS, DEPLOYMENT, listFills, priceOf, revokeAllowance, setStrategyActive, type CoinKey, type FillEvent, type StrategyState } from '@suijin/sdk';
 import { useState, type ReactNode } from 'react';
-import { COINS, COIN_KEYS, keyOf, openConnect, useAction, useBalances, useNow, usePoll, usePositions, type Approval, type Budget } from '../chain';
-import { Addr, CoinIcon, Empty, Meter, Skeleton, Tabs, TxLink, ago, fmt, pct, until } from '../ui';
+import { coin, keyOf, openConnect, tokens, useAction, useBalances, useNow, usePoll, usePositions, type Approval, type Budget } from '../chain';
+import { Addr, CoinIcon, Empty, Meter, Skeleton, Tabs, TxLink, ago, fmtAmt, fmtPrice, pct, until } from '../ui';
+import { decimalsOf, orientKeys } from './Earn';
+import { BalanceHint } from './trade';
 import './portfolio.css';
 import './provide.css'; // MarketRow (still used by Limit) styles its actions there
 
 // Position math and rows shared with Earn and Limit live here, next to the page that lists them all.
 
-const USD = 1_000_000n;
 
-/** Current price in tJPY per 1 tUSD (6-decimal units): the fixed rate, or the curve's marginal price after fee. */
-export function priceOf(s: StrategyState): bigint {
-  const sellsJpy = keyOf(s.baseType) === 'tJPY';
-  if (s.kind === 'fixed') return sellsJpy ? (s.priceDen * USD) / s.priceNum : (s.priceNum * USD) / s.priceDen;
+/**
+ * A market's current price as its pair reads, "1 unit = P priced" (PRICE_SCALE): the fixed rate, or
+ * the curve's marginal price after fee.
+ */
+export function strategyPrice(s: StrategyState): { price: bigint; unit: CoinKey; priced: CoinKey } {
+  const base = keyOf(s.baseType);
+  const { unit, priced } = orientKeys(base, keyOf(s.quoteType));
+  const dec = decimalsOf(unit, priced);
   const keep = BPS - s.feeBps;
-  return sellsJpy ? (s.virtualBase * USD * keep) / (s.virtualQuote * BPS) : (s.virtualQuote * USD * BPS) / (s.virtualBase * keep);
+  // Raw amounts that trade against each other at the current rate: [base side, quote side].
+  const [baseAmt, quoteAmt] = s.kind === 'fixed' ? [s.priceDen, s.priceNum] : [s.virtualBase * keep, s.virtualQuote * BPS];
+  const price = base === priced ? priceOf({ ...dec, unitAmount: quoteAmt, pricedAmount: baseAmt }) : priceOf({ ...dec, unitAmount: baseAmt, pricedAmount: quoteAmt });
+  return { price: price ?? 0n, unit, priced };
 }
 
 export const shapeLabel = (s: StrategyState) => (s.kind === 'curve' ? `Curve · ${pct(s.feeBps)}` : 'Fixed price');
@@ -111,9 +119,10 @@ export function MarketRow({ s, budget, status, now, actions, order }: Market & {
       key: toggleKey,
     });
   const ownBudget = order && budget && budget.markets.length === 1 ? budget : null;
+  const px = strategyPrice(s);
   const cancel = () =>
     ownBudget &&
-    act('Cancelling order', () => revokeAllowance({ coin: COINS[ownBudget.coin].type, allowanceId: ownBudget.allowance.id, capId: ownBudget.capId }), {
+    act('Cancelling order', () => revokeAllowance({ coin: coin(ownBudget.coin).type, allowanceId: ownBudget.allowance.id, capId: ownBudget.capId }), {
       done: 'Order cancelled',
       key: cancelKey,
     });
@@ -122,12 +131,12 @@ export function MarketRow({ s, budget, status, now, actions, order }: Market & {
       <div className="spread">
         <span className="inline">
           <CoinIcon coin={base} size={22} />
-          <b>{order ? `Sell ${fmt(total)} ${base}` : `Sells ${base} for ${quote}`}</b>
+          <b>{order ? `Sell ${fmtAmt(total, base)} ${base}` : `Sells ${base} for ${quote}`}</b>
         </span>
         <StatusChip status={status} order={order} />
       </div>
       <span className="small muted">
-        {order ? 'At' : `${shapeLabel(s)} ·`} 1 tUSD = <span className="num">{fmt(priceOf(s), 2)}</span> tJPY
+        {order ? 'At' : `${shapeLabel(s)} ·`} 1 {px.unit} = <span className="num">{fmtPrice(px.price)}</span> {px.priced}
       </span>
       <Meter value={sold} label={`${Math.round(sold * 100)}% sold`} />
       <div className="spread small">
@@ -136,14 +145,14 @@ export function MarketRow({ s, budget, status, now, actions, order }: Market & {
             `${Math.round(sold * 100)}% filled`
           ) : (
             <>
-              Sold <span className="num">{fmt(s.baseFilled)}</span> of {fmt(total)} {base}
+              Sold <span className="num">{fmtAmt(s.baseFilled, base)}</span> of {fmtAmt(total, base)} {base}
             </>
           )}
         </span>
         <span className="muted">
           Received{' '}
           <span className="gold num">
-            {fmt(s.quoteReceived)} {quote}
+            {fmtAmt(s.quoteReceived, quote)} {quote}
           </span>
         </span>
       </div>
@@ -237,11 +246,14 @@ export function Portfolio() {
   }
 
   const open = markets.filter((m) => m.status === 'open');
-  const ratios = (p?.budgets ?? []).map((b) => budgetRatio(b, bal?.[b.coin], now)).filter((r) => r.markets > 0);
+  const ratios = (p?.budgets ?? []).map((b) => budgetRatio(b, bal?.address[b.coin], now)).filter((r) => r.markets > 0);
   const avgRatio = ratios.length ? ratios.reduce((sum, r) => sum + r.ratio, 0) / ratios.length : null;
-  const received = { tUSD: 0n, tJPY: 0n };
-  for (const s of p?.strategies ?? []) received[keyOf(s.quoteType)] += s.quoteReceived;
-  const receivedCoins = COIN_KEYS.filter((c) => received[c] > 0n);
+  const received: Record<CoinKey, bigint> = {};
+  for (const s of p?.strategies ?? []) received[keyOf(s.quoteType)] = (received[keyOf(s.quoteType)] ?? 0n) + s.quoteReceived;
+  const receivedCoins = Object.keys(received).filter((c) => received[c]! > 0n);
+  // Every token the wallet holds (either form); the demo coins while it holds nothing.
+  const held = tokens().filter((t) => (bal?.address[t.key] ?? 0n) > 0n || (bal?.coins[t.key] ?? 0n) > 0n);
+  const shownTokens = held.length > 0 ? held : tokens().filter((t) => t.faucet);
   const loading = <Skeleton w={64} h={22} />;
 
   const tabs: { value: Tab; label: string; count?: number }[] = [
@@ -261,13 +273,14 @@ export function Portfolio() {
         <div className="pf-group">
           <h2>Balances</h2>
           <div className="pf-balances">
-            {COIN_KEYS.map((c) => (
+            {shownTokens.map(({ key: c }) => (
               <div key={c} className="pf-balance">
                 <CoinIcon coin={c} size={28} />
                 <span className="pf-figure">
-                  {bal ? <span className="pf-amount">{fmt(bal[c])}</span> : loading}
+                  {bal ? <span className="pf-amount">{fmtAmt(bal.address[c] ?? 0n, c)}</span> : loading}
                   <span className="pf-symbol">{c}</span>
                 </span>
+                <BalanceHint coin={c} balances={bal} me={me} />
               </div>
             ))}
           </div>
@@ -289,7 +302,7 @@ export function Portfolio() {
                 <span className="pf-received">
                   {receivedCoins.map((c) => (
                     <span key={c}>
-                      {fmt(received[c])} <span className="pf-symbol">{c}</span>
+                      {fmtAmt(received[c]!, c)} <span className="pf-symbol">{c}</span>
                     </span>
                   ))}
                 </span>
@@ -364,7 +377,7 @@ export function Portfolio() {
                   </thead>
                   <tbody>
                     {budgetRows.shown.map((b) => (
-                      <BudgetTr key={b.allowance.id} b={b} balance={bal?.[b.coin]} now={now} actions={actions} />
+                      <BudgetTr key={b.allowance.id} b={b} balance={bal?.address[b.coin]} now={now} actions={actions} />
                     ))}
                   </tbody>
                 </table>
@@ -468,6 +481,7 @@ function SkeletonTable({ cols, rows = 3 }: { cols: number; rows?: number }) {
 function MarketTr({ s, status, now, actions }: Market & { now: number; actions: Actions }) {
   const base = keyOf(s.baseType);
   const quote = keyOf(s.quoteType);
+  const px = strategyPrice(s);
   const total = s.baseFilled + s.virtualBaseRemaining;
   const sold = total > 0n ? Number((s.baseFilled * 1000n) / total) / 1000 : 0;
   const live = status === 'open' || status === 'paused';
@@ -491,19 +505,21 @@ function MarketTr({ s, status, now, actions }: Market & { now: number; actions: 
         </div>
       </td>
       <td className="r">
-        {fmt(priceOf(s), 2)}
-        <span className="sub">tJPY per tUSD</span>
+        {fmtPrice(px.price)}
+        <span className="sub">
+          {px.priced} per {px.unit}
+        </span>
       </td>
       <td>
         <div className="pf-meter">
           <Meter value={sold} label={`${Math.round(sold * 100)}% sold`} />
         </div>
         <span className="sub">
-          {fmt(s.baseFilled)} / {fmt(total)} {base}
+          {fmtAmt(s.baseFilled, base)} / {fmtAmt(total, base)} {base}
         </span>
       </td>
       <td className="r">
-        <span className="gold">{fmt(s.quoteReceived)}</span>
+        <span className="gold">{fmtAmt(s.quoteReceived, quote)}</span>
         <span className="sub">{quote}</span>
       </td>
       <td>
@@ -531,7 +547,7 @@ function BudgetTr({ b, balance, now, actions }: { b: Budget; balance: bigint | u
   const revoke = () => {
     const warn = `Revoke this ${b.coin} budget? Its ${r.markets} live ${r.markets === 1 ? 'market stops' : 'markets stop'} filling.`;
     if (r.markets > 0 && !window.confirm(warn)) return;
-    actions.act('Revoking budget', () => revokeAllowance({ coin: COINS[b.coin].type, allowanceId: b.allowance.id, capId: b.capId }), {
+    actions.act('Revoking budget', () => revokeAllowance({ coin: coin(b.coin).type, allowanceId: b.allowance.id, capId: b.capId }), {
       done: 'Budget revoked',
       key,
     });
@@ -555,7 +571,7 @@ function BudgetTr({ b, balance, now, actions }: { b: Budget; balance: bigint | u
           <Meter value={used} hot={used > 0.8} label={`${Math.round(used * 100)}% of budget used`} />
         </div>
         <span className="sub">
-          {fmt(spent)} / {cap === null ? 'no cap' : fmt(cap)} {b.coin}
+          {fmtAmt(spent, b.coin)} / {cap === null ? 'no cap' : fmtAmt(cap, b.coin)} {b.coin}
         </span>
       </td>
       <td className={expired ? 'bad' : 'muted'}>{expired ? 'Expired' : until(b.allowance.expirationMs ?? 0n, now)}</td>
@@ -577,7 +593,7 @@ function ApprovalTr({ a, now, actions }: { a: Approval; now: number; actions: Ac
         <div className="cell">
           <CoinIcon coin={a.coin} size={28} />
           <b>
-            {fmt(left)} {a.coin}
+            {fmtAmt(left, a.coin)} {a.coin}
           </b>
         </div>
       </td>
@@ -588,7 +604,7 @@ function ApprovalTr({ a, now, actions }: { a: Approval; now: number; actions: Ac
           className="act danger"
           disabled={!!actions.busy}
           onClick={() =>
-            actions.act('Revoking approval', () => revokeAllowance({ coin: COINS[a.coin].type, allowanceId: a.allowance.id, capId: a.capId }), {
+            actions.act('Revoking approval', () => revokeAllowance({ coin: coin(a.coin).type, allowanceId: a.allowance.id, capId: a.capId }), {
               done: 'Approval revoked',
               key,
             })
@@ -620,11 +636,11 @@ function ActivityTr({ f, me, now }: { f: FillEvent; me: string; now: number }) {
       </td>
       <td className="r">
         <b>
-          {fmt(f.baseOut)} {base}
+          {fmtAmt(f.baseOut, base)} {base}
         </b>
       </td>
       <td className="r muted">
-        {fmt(f.quoteIn)} {quote}
+        {fmtAmt(f.quoteIn, quote)} {quote}
       </td>
       <td>
         <Addr a={row.who} />
