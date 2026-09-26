@@ -457,22 +457,17 @@ export function Earn() {
           ) : (
             <>
               <Step n={1} title="What you offer">
-                <div className="pair-cards" role="group" aria-label="Pair">
+                <div className="pair-bar" role="group" aria-label="Pair">
                   <TokenPicker
                     variant="card"
-                    caption="Token A"
                     label="First token of the pair"
                     value={unit}
                     exclude={priced}
                     onPick={(k) => setPair(k, priced)}
                     balances={balances.value?.address}
                   />
-                  <span className="pair-link" aria-hidden="true">
-                    /
-                  </span>
                   <TokenPicker
                     variant="card"
-                    caption="Token B"
                     label="Second token of the pair"
                     value={priced}
                     exclude={unit}
