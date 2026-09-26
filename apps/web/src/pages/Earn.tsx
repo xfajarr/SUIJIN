@@ -393,7 +393,15 @@ export function Earn() {
                   full
                   value={shape}
                   onChange={setShape}
-                  options={SHAPES.map((o) => ({ value: o.value, label: o.title }))}
+                  options={SHAPES.map((o) => ({
+                    value: o.value,
+                    label: (
+                      <span className="shape-opt">
+                        {o.icon}
+                        {o.title}
+                      </span>
+                    ),
+                  }))}
                 />
                 <PriceStepper price={price} onChange={setPrice} mid={market.mid} loading={market.loading} sides={sides} />
                 <div className="knob">
