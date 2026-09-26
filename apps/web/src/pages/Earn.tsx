@@ -503,39 +503,49 @@ function PriceStepper(p: { price: string | null; onChange: (v: string) => void; 
   const hurts = risky && (p.sides === 'both' || p.sides === loser);
   return (
     <div className="fieldset">
-      <div className={`stepper${P !== null && P <= 0n ? ' invalid' : ''}`}>
-        <button type="button" className="step-btn" onClick={() => step(-1)} aria-label="Lower price">
-          −
-        </button>
-        <label htmlFor={id} className="stepper-mid">
-          <span className="faint small">1 tUSD =</span>
-          {p.price === null ? (
-            <Skeleton w={90} h={24} />
-          ) : (
-            <input id={id} inputMode="decimal" autoComplete="off" spellCheck={false} value={p.price} onChange={(e) => p.onChange(cleanAmount(e.target.value))} />
-          )}
-          <span className="faint small">tJPY</span>
+      <div className="spread">
+        <label htmlFor={id} className="field-label">
+          Your price <span className="faint">· tJPY for 1 tUSD</span>
         </label>
-        <button type="button" className="step-btn" onClick={() => step(1)} aria-label="Raise price">
-          +
-        </button>
-      </div>
-      <div className="spread small">
-        <span className="muted">
-          {p.loading ? 'Loading market…' : mid !== null ? <>Market <b className="ink">{num(mid)}</b></> : 'No live market yet'}
-          {off !== null && Math.abs(off) >= 0.0005 && (
-            <span className={`pv-tag${hurts ? ' bad-tag' : ''}`}>
-              {off > 0 ? '+' : '−'}
-              {Math.abs(off * 100).toFixed(1)}% vs market
-            </span>
-          )}
-        </span>
         {mid !== null && (
           <button type="button" className="chip-btn" onClick={() => p.onChange(priceText(p.mid!))}>
             Use market
           </button>
         )}
       </div>
+      <div className="stepper">
+        <button type="button" className="step-btn" onClick={() => step(-1)} aria-label="Lower price by 0.1%">
+          −
+        </button>
+        <label htmlFor={id} className={`stepper-field${P !== null && P <= 0n ? ' invalid' : ''}`}>
+          {p.price === null ? (
+            <Skeleton w={90} h={24} />
+          ) : (
+            <input
+              id={id}
+              inputMode="decimal"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="150.00"
+              value={p.price}
+              onChange={(e) => p.onChange(cleanAmount(e.target.value))}
+            />
+          )}
+          <span className="faint small">tJPY</span>
+        </label>
+        <button type="button" className="step-btn" onClick={() => step(1)} aria-label="Raise price by 0.1%">
+          +
+        </button>
+      </div>
+      <span className="small muted">
+        {p.loading ? 'Loading market…' : mid !== null ? <>Market <b className="ink">{num(mid)}</b></> : 'No live market yet'}
+        {off !== null && Math.abs(off) >= 0.0005 && (
+          <span className={`pv-tag${hurts ? ' bad-tag' : ''}`}>
+            {off > 0 ? '+' : '−'}
+            {Math.abs(off * 100).toFixed(1)}% vs market
+          </span>
+        )}
+      </span>
       {hurts && (
         <span className="hint warn">
           Traders would buy your {loser} {Math.abs(off! * 100).toFixed(0)}% cheaper than the market. Move closer to {num(mid!)} unless you mean it.
