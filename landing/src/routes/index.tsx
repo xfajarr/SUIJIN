@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { initLanding } from '#/lib/landing'
 import Footer from '#/components/Footer'
+import Products from '#/components/Products'
 
 export const Route = createFileRoute('/')({ component: Landing })
 
@@ -238,6 +239,8 @@ function Landing() {
           ))}
         </ol>
       </section>
+
+      <Products />
 
       <Footer />
     </>
