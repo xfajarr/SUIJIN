@@ -7,7 +7,7 @@ import {
   DEPLOYMENT,
   GRPC_URL,
   addressBalance,
-  coinsOf,
+  demoCoinsOf,
   createStrategies,
   createTakerOrder,
   formatUnits,
@@ -22,7 +22,7 @@ const client = new SuiGrpcClient({ network: DEPLOYMENT.network, baseUrl: GRPC_UR
 const provider = Ed25519Keypair.fromSecretKey(process.env.MAKER_SECRET_KEY!);
 const trader = Ed25519Keypair.fromSecretKey(process.env.TAKER_SECRET_KEY!);
 const merchant = new Ed25519Keypair().toSuiAddress(); // fresh address: receives only
-const { tJPY, tUSD } = coinsOf();
+const { tJPY, tUSD } = demoCoinsOf();
 const HOUR = 3_600_000;
 
 type ServerQuote = { strategyId: string; kind: string; makerAllowanceId: string; baseType: string; quoteType: string; quoteIn: string; baseOut: string; minBaseOut: string };
